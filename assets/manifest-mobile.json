@@ -1,0 +1,26 @@
+{
+  "name": "Bunny Runner - Cute Endless Adventure",
+  "short_name": "Bunny Runner",
+  "description": "The cutest endless runner game ever! Help bunny hop through obstacles and collect gems! 🐰✨",
+  "start_url": "/mobile/index.html",
+  "display": "standalone",
+  "background_color": "#FFB6C1",
+  "theme_color": "#DDA0DD",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23FFB6C1' width='100' height='100'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle'%3E🐰%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23FFB6C1' width='100' height='100'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle'%3E🐰%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "screenshots": []
+}

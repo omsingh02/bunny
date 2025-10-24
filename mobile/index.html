@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bunny Runner Mobile - Cute Endless Adventure! 🐰✨</title>
+    <meta name="description" content="The cutest endless runner game ever! Help bunny hop through obstacles and collect gems! 🐰✨">
+    <meta name="theme-color" content="#DDA0DD">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="icon" type="image/svg+xml" href="../assets/icons/favicon-mobile.svg">
+    <link rel="manifest" href="../assets/manifest-mobile.json">
+    <link rel="stylesheet" href="../assets/styles/mobile.css">
+    <script src="../assets/scripts/redirect.js"></script>
+</head>
+<body>
+    <!-- Game Container -->
+    <div id="game-container">
+        <!-- Three.js Canvas -->
+        <canvas id="game-canvas"></canvas>
+        
+        <!-- UI Overlay -->
+        <div id="ui-overlay">
+            <!-- Main Menu -->
+            <div id="main-menu" class="screen">
+                <div class="menu-content">
+                    <h1 class="game-title">🐰✨ Bunny Runner ✨🐰</h1>
+                    <p class="game-subtitle">Mobile Edition 💕🌸💫</p>
+                    <div class="character-preview">
+                        <div class="bunny-icon">🐰</div>
+                        <div class="sparkles">✨💖✨</div>
+                    </div>
+                    <!-- Difficulty Selection -->
+                    <div class="difficulty-selection">
+                        <h3 class="difficulty-title">Pick your vibe! ✨</h3>
+                        <div class="difficulty-selector">
+                            <button id="difficulty-prev" class="difficulty-arrow" aria-label="Previous difficulty">‹</button>
+                            <div class="difficulty-display">
+                                <div class="difficulty-icon" id="current-difficulty-icon">💕</div>
+                                <div class="difficulty-info">
+                                    <div class="difficulty-name" id="current-difficulty-name">Happy Run</div>
+                                    <div class="difficulty-desc" id="current-difficulty-desc">Balanced fun &amp; challenge!</div>
+                                </div>
+                            </div>
+                            <button id="difficulty-next" class="difficulty-arrow" aria-label="Next difficulty">›</button>
+                        </div>
+                        <div class="recommended-badge" id="recommended-badge">Recommended</div>
+                    </div>
+                    
+                    <button id="start-btn" class="btn btn--primary">
+                        <span>START ADVENTURE</span>
+                        <div class="btn-sparkle">💫</div>
+                    </button>
+                    <div class="menu-buttons">
+                        <button id="how-to-play-btn" class="btn btn--secondary">
+                            <span>📖 HOW TO PLAY</span>
+                        </button>
+                        <button id="leaderboard-btn" class="btn btn--secondary">
+                            <span>🏆 LEADERBOARD</span>
+                        </button>
+                        <button id="settings-btn" class="btn btn--outline">
+                            <span>⚙️ SETTINGS</span>
+                        </button>
+                    </div>
+                    <div class="best-score-display">
+                        <span>Best Score: </span>
+                        <span id="best-score-menu">0</span>
+                        <span> 🏆</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tutorial/How to Play Screen -->
+            <div id="tutorial-screen" class="screen hidden">
+                <div class="menu-content">
+                    <h2>📖 How to Play 🐰</h2>
+                    <div class="tutorial-content">
+                        <div class="tutorial-section">
+                            <h3>🎮 Touch Controls</h3>
+                            <div class="tutorial-controls">
+                                <div class="tutorial-control">
+                                    <div class="control-keys">
+                                        <span class="key">‹</span>
+                                        <span class="key">›</span>
+                                    </div>
+                                    <p>Move between lanes</p>
+                                </div>
+                                <div class="tutorial-control">
+                                    <div class="control-keys">
+                                        <span class="key">↑</span>
+                                    </div>
+                                    <p>Jump over obstacles</p>
+                                </div>
+                            </div>
+                            <p class="tutorial-mobile">📱 Swipe left/right or tap buttons!</p>
+                        </div>
+                        <div class="tutorial-section">
+                            <h3>💎 Collectibles</h3>
+                            <p>Collect sparkly gems to increase your score!</p>
+                            <p><strong>🔥 Combo System:</strong> Collect gems quickly to build combos up to 10x multiplier!</p>
+                        </div>
+                        <div class="tutorial-section">
+                            <h3>🎯 Milestones</h3>
+                            <p>Reach score milestones for special celebrations!</p>
+                        </div>
+                    </div>
+                    <button id="tutorial-close-btn" class="btn btn--primary">GOT IT! 🚀</button>
+                </div>
+            </div>
+
+            <!-- Settings Screen -->
+            <div id="settings-screen" class="screen hidden">
+                <div class="menu-content">
+                    <h2>⚙️ Settings</h2>
+                    <div class="settings-content">
+                        <div class="setting-item">
+                            <label for="music-setting">🎵 Music</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="music-setting" checked>
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="sfx-setting">🔊 Sound</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="sfx-setting" checked>
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="haptic-setting">📳 Haptic</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="haptic-setting" checked>
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="particles-setting">✨ Particles</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="particles-setting" checked>
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <button id="fullscreen-setting-btn" class="btn btn--outline btn--sm" style="width: 100%;">
+                                📱 Enter Fullscreen
+                            </button>
+                        </div>
+                        <div class="setting-item">
+                            <button id="reset-data-btn" class="btn btn--outline btn--sm">🗑️ Reset Data</button>
+                        </div>
+                    </div>
+                    <button id="settings-close-btn" class="btn btn--primary">SAVE</button>
+                </div>
+            </div>
+
+            <!-- Leaderboard Screen -->
+            <div id="leaderboard-screen" class="screen hidden">
+                <div class="menu-content">
+                    <h2>🏆 Leaderboard</h2>
+                    <div class="leaderboard-content">
+                        <div class="leaderboard-tabs">
+                            <button class="leaderboard-tab active" data-difficulty="all">All</button>
+                            <button class="leaderboard-tab" data-difficulty="0">Easy</button>
+                            <button class="leaderboard-tab" data-difficulty="1">Normal</button>
+                            <button class="leaderboard-tab" data-difficulty="2">Hard</button>
+                        </div>
+                        <div id="leaderboard-list" class="leaderboard-list">
+                            <div class="leaderboard-empty">
+                                <p>🌟 No scores yet!</p>
+                                <p>Start playing!</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="leaderboard-close-btn" class="btn btn--primary">BACK</button>
+                </div>
+            </div>
+
+            <!-- Game HUD -->
+            <div id="game-hud" class="screen hidden">
+                <div class="hud-top">
+                    <div class="score-container">
+                        <div class="score-item">
+                            <span class="score-label">Score</span>
+                            <span id="current-score" class="score-value">0</span>
+                        </div>
+                        <div class="score-item">
+                            <span class="score-label">Best</span>
+                            <span id="best-score" class="score-value">0</span>
+                        </div>
+                        <div class="score-item combo-item" id="combo-display" style="display: none;">
+                            <span class="score-label">Combo</span>
+                            <span id="combo-count" class="score-value">0</span>
+                        </div>
+                    </div>
+                    <div class="hud-controls">
+                        <button id="fullscreen-toggle" class="btn btn--icon" title="Fullscreen">
+                            <span style="font-size: 1.2rem; font-weight: bold;">⛶</span>
+                        </button>
+                        <button id="music-toggle" class="btn btn--icon" title="Music">
+                            <span style="font-size: 1.2rem; font-weight: bold;">♫</span>
+                        </button>
+                        <button id="pause-btn" class="btn btn--sm">
+                            <span style="font-size: 1.4rem; font-weight: bold;">‖</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Milestone Progress -->
+                <div class="milestone-progress" id="milestone-progress">
+                    <div class="milestone-label">Next: <span id="next-milestone">100</span> 🎯</div>
+                    <div class="milestone-bar">
+                        <div class="milestone-fill" id="milestone-fill"></div>
+                    </div>
+                </div>
+                
+                <!-- Achievement Toast -->
+                <div class="achievement-toast hidden" id="achievement-toast">
+                    <div class="achievement-icon">🏆</div>
+                    <div class="achievement-info">
+                        <div class="achievement-title" id="achievement-title">Achievement!</div>
+                        <div class="achievement-desc" id="achievement-desc">Description</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Countdown Screen -->
+            <div id="countdown-screen" class="screen hidden">
+                <div class="countdown-number" id="countdown-number">3</div>
+            </div>
+
+            <!-- Pause Menu -->
+            <div id="pause-menu" class="screen hidden">
+                <div class="menu-content">
+                    <h2>Paused 🐰💤</h2>
+                    <div class="pause-stats">
+                        <div class="pause-stat">
+                            <span class="pause-label">Score</span>
+                            <span class="pause-value" id="pause-score">0</span>
+                        </div>
+                        <div class="pause-stat">
+                            <span class="pause-label">Combo</span>
+                            <span class="pause-value" id="pause-combo">0x</span>
+                        </div>
+                    </div>
+                    <div class="button-group">
+                        <button id="resume-btn" class="btn btn--primary">RESUME</button>
+                        <button id="pause-settings-btn" class="btn btn--secondary">⚙️</button>
+                        <button id="restart-btn" class="btn btn--secondary">RESTART</button>
+                        <button id="menu-btn" class="btn btn--outline">MENU</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Over -->
+            <div id="game-over" class="screen hidden">
+                <div class="menu-content">
+                    <div class="game-over-icon">🌟</div>
+                    <h2 id="game-over-title">Awesome!</h2>
+                    <p id="game-over-message">Great run! 💕</p>
+                    
+                    <div class="score-summary">
+                        <div class="final-score">
+                            <span class="score-label">Score</span>
+                            <span id="final-score" class="score-big">0</span>
+                        </div>
+                        <div class="best-score-final">
+                            <span class="score-label">Best</span>
+                            <span id="best-score-final" class="score-big">0</span>
+                        </div>
+                    </div>
+                    
+                    <div class="celebration" id="celebration">
+                        <div class="confetti">🎉</div>
+                        <div class="confetti">✨</div>
+                        <div class="confetti">💖</div>
+                        <div class="confetti">🌟</div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button id="play-again-btn" class="btn btn--primary">PLAY AGAIN</button>
+                        <button id="menu-return-btn" class="btn btn--secondary">MENU</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Touch Controls -->
+        <div id="touch-controls" class="touch-controls hidden">
+            <button id="touch-left" class="touch-btn touch-left" aria-label="Move left">
+                <span>‹</span>
+            </button>
+            <button id="touch-jump" class="touch-btn touch-jump" aria-label="Jump">
+                <span>↑</span>
+            </button>
+            <button id="touch-right" class="touch-btn touch-right" aria-label="Move right">
+                <span>›</span>
+            </button>
+        </div>
+        
+        <!-- Particle Effects Container -->
+        <div id="particles-container"></div>
+        
+        <!-- Loading Screen -->
+        <div id="loading-screen">
+            <div class="loading-content">
+                <div class="loading-bunny">🐰</div>
+                <div class="loading-text">Loading...</div>
+                <div class="loading-bar">
+                    <div class="loading-progress" id="loading-progress"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Error Screen -->
+        <div id="error-screen" class="screen hidden">
+            <div class="menu-content">
+                <div class="error-icon">😢</div>
+                <h2 id="error-title">Oops!</h2>
+                <p id="error-message">Something went wrong.</p>
+                <div class="error-details" id="error-details"></div>
+                <div class="button-group">
+                    <button id="error-retry-btn" class="btn btn--primary">RETRY</button>
+                    <button id="error-reload-btn" class="btn btn--secondary">RELOAD</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../assets/scripts/mobile.js"></script>
+    <script>
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('../assets/scripts/sw-mobile.js');
+        }
+    </script>
+</body>
+</html>
