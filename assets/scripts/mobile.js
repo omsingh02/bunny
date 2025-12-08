@@ -1364,6 +1364,13 @@ class BunnyRunnerGame {
         // Now actually start the game
         this.gameState = 'playing';
         
+        // Track game start
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'game_start', {
+                difficulty: this.selectedDifficulty
+            });
+        }
+        
         // Start background music if enabled
         if (this.settings.musicEnabled && this.audioEnabled) {
             this.startBackgroundMusic();
@@ -1394,6 +1401,14 @@ class BunnyRunnerGame {
 
         // Stop background music on game over
         this.stopBackgroundMusic();
+        
+        // Track game over
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'game_over', {
+                score: this.score,
+                difficulty: this.selectedDifficulty
+            });
+        }
         
         // Add to leaderboard
         this.addToLeaderboard(this.score, this.selectedDifficulty);
@@ -1679,6 +1694,14 @@ class BunnyRunnerGame {
     celebrateMilestone(milestone) {
         this.soundEffects.milestone();
         this.triggerHapticFeedback('success');
+        
+        // Track milestone
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'milestone', {
+                score: milestone,
+                difficulty: this.selectedDifficulty
+            });
+        }
         
         // Show milestone message
         const milestoneText = document.createElement('div');
