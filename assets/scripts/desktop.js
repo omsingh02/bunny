@@ -1329,6 +1329,11 @@ class BunnyRunnerGame {
         // Now actually start the game
         this.gameState = 'playing';
         
+        // Track game start
+        if (typeof umami !== 'undefined') {
+            umami.track('game-start', { difficulty: this.selectedDifficulty, platform: 'desktop' });
+        }
+        
         // Start background music if enabled
         if (this.settings.musicEnabled && this.audioEnabled) {
             this.startBackgroundMusic();
@@ -1359,6 +1364,16 @@ class BunnyRunnerGame {
 
         // Stop background music on game over
         this.stopBackgroundMusic();
+        
+        // Track game over with stats
+        if (typeof umami !== 'undefined') {
+            umami.track('game-over', {
+                score: this.score,
+                difficulty: this.selectedDifficulty,
+                maxCombo: this.maxComboThisRun,
+                platform: 'desktop'
+            });
+        }
         
         // Add to leaderboard
         this.addToLeaderboard(this.score, this.selectedDifficulty);
