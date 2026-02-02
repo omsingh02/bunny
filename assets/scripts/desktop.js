@@ -15,13 +15,17 @@ class BunnyRunnerGame {
         this.gameState = 'loading'; // loading, menu, playing, paused, gameOver
         this.score = 0;
         this.bestScore = this.getBestScore();
-        this.speed = 0.15;
-        this.baseSpeed = 0.15;
-        this.speedIncrement = 0.002;
+        // Speed values are now per-second (multiplied by 60 from original per-frame values)
+        this.speed = 9;
+        this.baseSpeed = 9;
+        this.speedIncrement = 0.12;
         this.jumpVelocity = 0;
         this.isJumping = false;
-        this.jumpPower = 0.3;
-        this.gravity = 0.015;
+        this.jumpPower = 18;
+        this.gravity = 0.9;
+        
+        // Time accumulator for frame-rate independent scoring
+        this.scoreTimer = 0;
         
         // Difficulty settings
         this.selectedDifficulty = 'medium';
@@ -29,27 +33,27 @@ class BunnyRunnerGame {
             easy: {
                 name: 'Relaxed Garden Stroll',
                 icon: '🌸',
-                baseSpeed: 0.10,
-                acceleration: 0.001,
-                maxSpeed: 0.20,
+                baseSpeed: 6,
+                acceleration: 0.06,
+                maxSpeed: 12,
                 obstacleInterval: [2500, 3500],
                 collectibleInterval: [1500, 2500]
             },
             medium: {
                 name: 'Happy Run',
                 icon: '💕',
-                baseSpeed: 0.15,
-                acceleration: 0.002,
-                maxSpeed: 0.35,
+                baseSpeed: 9,
+                acceleration: 0.12,
+                maxSpeed: 21,
                 obstacleInterval: [1000, 2000],
                 collectibleInterval: [2000, 4000]
             },
             hard: {
                 name: 'Speed Bunny Challenge',
                 icon: '⚡',
-                baseSpeed: 0.22,
-                acceleration: 0.003,
-                maxSpeed: 0.50,
+                baseSpeed: 13.2,
+                acceleration: 0.18,
+                maxSpeed: 30,
                 obstacleInterval: [800, 1500],
                 collectibleInterval: [3000, 5000]
             }
@@ -1273,6 +1277,10 @@ class BunnyRunnerGame {
         this.targetLanePosition = 0;
         this.isJumping = false;
         this.jumpVelocity = 0;
+        this.scoreTimer = 0;
+        
+        // Reset the clock to prevent large deltaTime on first frame
+        this.clock.getDelta();
         
         // Reset combo system
         this.comboCount = 0;
@@ -1351,6 +1359,8 @@ class BunnyRunnerGame {
     
     resumeGame() {
         if (this.gameState === 'paused') {
+            // Reset the clock to prevent large deltaTime after pause
+            this.clock.getDelta();
             this.gameState = 'playing';
             if (this.settings.musicEnabled && this.audioEnabled) {
                 this.startBackgroundMusic();
@@ -1802,11 +1812,16 @@ class BunnyRunnerGame {
     update() {
         if (this.gameState !== 'playing') return;
         
-        const deltaTime = this.clock.getDelta();
+        let deltaTime = this.clock.getDelta();
+        // Clamp deltaTime to prevent huge jumps after pause/tab switch (max ~100ms)
+        deltaTime = Math.min(deltaTime, 0.1);
         this.frameCount++;
         
+        // Calculate frame-rate independent movement
+        const movement = this.speed * deltaTime;
+        
         // Update world position
-        this.worldPosition += this.speed;
+        this.worldPosition += movement;
         
         // Handle continuous obstacle spawning
         this.updateObstacleSpawning(deltaTime);
@@ -1814,15 +1829,15 @@ class BunnyRunnerGame {
         // Handle continuous collectible spawning - FIX FOR CONTINUOUS SPAWNING
         this.updateCollectibleSpawning(deltaTime);
         
-        // Move world towards camera
+        // Move world towards camera (frame-rate independent)
         this.obstacles.forEach(obstacle => {
-            obstacle.position.z += this.speed;
+            obstacle.position.z += movement;
         });
         
         this.collectibles.forEach(collectible => {
-            collectible.position.z += this.speed;
-            // Rotate collectibles for visual appeal
-            collectible.rotation.y += 0.05;
+            collectible.position.z += movement;
+            // Rotate collectibles for visual appeal (frame-rate independent)
+            collectible.rotation.y += 3 * deltaTime;
         });
         
         // Generate new world chunks as needed
@@ -1831,15 +1846,16 @@ class BunnyRunnerGame {
             this.worldPosition = 0;
         }
         
-        // Update bunny lane position (smooth interpolation)
+        // Update bunny lane position (smooth interpolation, frame-rate independent)
         const currentX = this.bunny.position.x;
         const targetX = this.targetLanePosition;
-        this.bunny.position.x = currentX + (targetX - currentX) * 0.2;
+        const laneSmoothing = 1 - Math.pow(0.00001, deltaTime); // Approximately 0.2 at 60fps
+        this.bunny.position.x = currentX + (targetX - currentX) * laneSmoothing;
         
-        // Update jumping
+        // Update jumping (frame-rate independent physics)
         if (this.isJumping) {
-            this.bunny.position.y += this.jumpVelocity;
-            this.jumpVelocity -= this.gravity;
+            this.bunny.position.y += this.jumpVelocity * deltaTime;
+            this.jumpVelocity -= this.gravity * deltaTime;
             
             if (this.bunny.position.y <= 0) {
                 this.bunny.position.y = 0;
@@ -1848,7 +1864,7 @@ class BunnyRunnerGame {
             }
         }
         
-        // Add cute bouncy running animation
+        // Add cute bouncy running animation (using frameCount for visual consistency)
         this.bunny.rotation.z = Math.sin(this.frameCount * 0.2) * 0.15;
         this.bunny.rotation.x = this.isJumping ? -0.3 : Math.sin(this.frameCount * 0.15) * 0.08;
         
@@ -1862,13 +1878,14 @@ class BunnyRunnerGame {
         const oldSpeed = this.speed;
         this.speed = Math.min(this.baseSpeed + (this.score * this.speedIncrement * 0.1), config.maxSpeed);
         
-        // Visual feedback when speed tier changes
-        if (Math.floor(this.speed * 10) > Math.floor(oldSpeed * 10)) {
+        // Visual feedback when speed tier changes (adjusted threshold for new scale)
+        if (Math.floor(this.speed) > Math.floor(oldSpeed)) {
             this.showSpeedUpFeedback();
         }
         
-        // Update camera to follow bunny
-        this.camera.position.x += (this.bunny.position.x * 0.3 - this.camera.position.x) * 0.1;
+        // Update camera to follow bunny (frame-rate independent)
+        const cameraSmoothing = 1 - Math.pow(0.000001, deltaTime);
+        this.camera.position.x += (this.bunny.position.x * 0.3 - this.camera.position.x) * cameraSmoothing;
         
         // Update particles
         this.updateParticles();
@@ -1876,10 +1893,12 @@ class BunnyRunnerGame {
         // Check collisions
         this.checkCollisions();
         
-        // Add distance-based score
-        if (this.frameCount % 30 === 0) {
+        // Add time-based score (every 0.5 seconds = ~30 frames at 60fps)
+        this.scoreTimer += deltaTime;
+        if (this.scoreTimer >= 0.5) {
             this.score += 1;
             this.updateScore();
+            this.scoreTimer = 0;
         }
         
         // Check achievements
