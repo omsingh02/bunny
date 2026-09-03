@@ -91,6 +91,7 @@ class BunnyRunnerGame {
         
         this.clock = new THREE.Clock();
         this.frameCount = 0;
+        this.gameTime = 0;
         
         // Audio setup
         this.audioListener = null;
@@ -1320,6 +1321,7 @@ class BunnyRunnerGame {
         this.isJumping = false;
         this.jumpVelocity = 0;
         this.scoreTimer = 0;
+        this.gameTime = 0;
         
         // Reset the clock to prevent large deltaTime on first frame
         this.clock.getDelta();
@@ -1798,17 +1800,20 @@ class BunnyRunnerGame {
         this.scene.add(sparkleGroup);
     }
     
-    updateParticles() {
+    updateParticles(deltaTime = 0.016) {
+        const timeScale = deltaTime * 60; // Normalize against 60fps baseline
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const particle = this.particles[i];
             
             if (particle.userData.type === 'sparkle') {
-                particle.userData.life -= 0.05;
+                particle.userData.life -= 0.05 * timeScale;
                 
                 particle.children.forEach(sparkle => {
-                    sparkle.position.add(sparkle.userData.velocity);
-                    sparkle.userData.velocity.y -= 0.01; // Gravity
-                    sparkle.material.opacity = particle.userData.life;
+                    sparkle.position.x += sparkle.userData.velocity.x * timeScale;
+                    sparkle.position.y += sparkle.userData.velocity.y * timeScale;
+                    sparkle.position.z += sparkle.userData.velocity.z * timeScale;
+                    sparkle.userData.velocity.y -= 0.01 * timeScale; // Gravity
+                    sparkle.material.opacity = Math.max(0, particle.userData.life);
                 });
                 
                 if (particle.userData.life <= 0) {
@@ -1858,9 +1863,10 @@ class BunnyRunnerGame {
         if (this.gameState !== 'playing') return;
         
         let deltaTime = this.clock.getDelta();
-        // Clamp deltaTime to prevent huge jumps after pause/tab switch (max ~100ms)
-        deltaTime = Math.min(deltaTime, 0.1);
+        // Clamp deltaTime to prevent huge jumps after pause/tab switch (max 50ms)
+        deltaTime = Math.min(deltaTime, 0.05);
         this.frameCount++;
+        this.gameTime += deltaTime;
         
         // Calculate frame-rate independent movement
         const movement = this.speed * deltaTime;
@@ -1871,7 +1877,7 @@ class BunnyRunnerGame {
         // Handle continuous obstacle spawning
         this.updateObstacleSpawning(deltaTime);
         
-        // Handle continuous collectible spawning - FIX FOR CONTINUOUS SPAWNING
+        // Handle continuous collectible spawning
         this.updateCollectibleSpawning(deltaTime);
         
         // Move world towards camera (frame-rate independent)
@@ -1881,21 +1887,18 @@ class BunnyRunnerGame {
         
         this.collectibles.forEach(collectible => {
             collectible.position.z += movement;
-            // Rotate collectibles for visual appeal (frame-rate independent)
-            collectible.rotation.y += 3 * deltaTime;
+            // Rotate collectibles for visual appeal (frame-rate independent: ~170 deg/sec)
+            collectible.rotation.y += 3.0 * deltaTime;
         });
         
-        // Generate new world chunks as needed
-        if (this.worldPosition > 20) {
+        // Generate new world chunks as needed (preserve fractional remainder)
+        if (this.worldPosition >= 20) {
             this.generateWorldChunk(-40);
-            this.worldPosition = 0;
+            this.worldPosition -= 20;
         }
         
-        // Update bunny lane position (smooth interpolation, frame-rate independent)
-        const currentX = this.bunny.position.x;
-        const targetX = this.targetLanePosition;
-        const laneSmoothing = 1 - Math.pow(0.00001, deltaTime); // Approximately 0.2 at 60fps
-        this.bunny.position.x = currentX + (targetX - currentX) * laneSmoothing;
+        // Update bunny lane position (smooth exponential damping, frame-rate independent)
+        this.bunny.position.x = THREE.MathUtils.damp(this.bunny.position.x, this.targetLanePosition, 15, deltaTime);
         
         // Update jumping (frame-rate independent physics)
         if (this.isJumping) {
@@ -1907,43 +1910,42 @@ class BunnyRunnerGame {
                 this.isJumping = false;
                 this.jumpVelocity = 0;
             }
+        } else {
+            // Cute gentle hopping bounce tied to continuous time (frame-rate independent, not accumulating with +=)
+            const bounceCycle = this.gameTime * 12; // ~1.91 Hz, natural cute hopping
+            this.bunny.position.y = Math.abs(Math.sin(bounceCycle)) * 0.08;
         }
         
-        // Add cute bouncy running animation (using frameCount for visual consistency)
-        this.bunny.rotation.z = Math.sin(this.frameCount * 0.2) * 0.15;
-        this.bunny.rotation.x = this.isJumping ? -0.3 : Math.sin(this.frameCount * 0.15) * 0.08;
-        
-        // Add subtle y-axis bobbing for extra cuteness
-        if (!this.isJumping) {
-            this.bunny.position.y += Math.sin(this.frameCount * 0.3) * 0.02;
-        }
+        // Cute bouncy running animation tied to continuous time (smooth on 60Hz, 120Hz, 144Hz+)
+        const swayCycle = this.gameTime * 12;
+        this.bunny.rotation.z = Math.sin(swayCycle) * 0.12;
+        this.bunny.rotation.x = this.isJumping ? -0.3 : Math.sin(this.gameTime * 9) * 0.06;
         
         // Update speed (gradually increase difficulty) - respects difficulty settings
         const config = this.difficultyConfig[this.selectedDifficulty];
         const oldSpeed = this.speed;
         this.speed = Math.min(this.baseSpeed + (this.score * this.speedIncrement * 0.1), config.maxSpeed);
         
-        // Visual feedback when speed tier changes (adjusted threshold for new scale)
+        // Visual feedback when speed tier changes
         if (Math.floor(this.speed) > Math.floor(oldSpeed)) {
             this.showSpeedUpFeedback();
         }
         
-        // Update camera to follow bunny (frame-rate independent)
-        const cameraSmoothing = 1 - Math.pow(0.000001, deltaTime);
-        this.camera.position.x += (this.bunny.position.x * 0.3 - this.camera.position.x) * cameraSmoothing;
+        // Update camera to follow bunny (smooth exponential damping, frame-rate independent)
+        this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, this.bunny.position.x * 0.3, 8, deltaTime);
         
-        // Update particles
-        this.updateParticles();
+        // Update particles with deltaTime
+        this.updateParticles(deltaTime);
         
         // Check collisions
         this.checkCollisions();
         
-        // Add time-based score (every 0.5 seconds = ~30 frames at 60fps)
+        // Add time-based score (every 0.5 seconds, preserving fractional delta)
         this.scoreTimer += deltaTime;
         if (this.scoreTimer >= 0.5) {
             this.score += 1;
             this.updateScore();
-            this.scoreTimer = 0;
+            this.scoreTimer -= 0.5;
         }
         
         // Check achievements
@@ -1985,16 +1987,16 @@ class BunnyRunnerGame {
     updateObstacleSpawning(deltaTime) {
         if (this.gameState !== 'playing') return;
         
-        const currentTime = Date.now();
+        this.obstacleSpawnTimer += deltaTime * 1000;
         
         // Check if it's time to spawn a new obstacle
-        if (currentTime - this.lastObstacleSpawnTime >= this.nextObstacleSpawnTime) {
+        if (this.obstacleSpawnTimer >= this.nextObstacleSpawnTime) {
             // Spawn obstacle ahead of player
             const spawnZ = this.bunny.position.z - this.obstacleSpawnDistance;
             this.createObstacle(spawnZ);
             
-            // Set next spawn time
-            this.lastObstacleSpawnTime = currentTime;
+            // Reset timer and set next spawn interval
+            this.obstacleSpawnTimer = 0;
             this.nextObstacleSpawnTime = this.getRandomObstacleInterval();
         }
         
@@ -2005,10 +2007,10 @@ class BunnyRunnerGame {
     updateCollectibleSpawning(deltaTime) {
         if (this.gameState !== 'playing') return;
         
-        const currentTime = Date.now();
+        this.collectibleSpawnTimer += deltaTime * 1000;
         
-        // Check if it's time to spawn a new collectible - FIX FOR CONTINUOUS SPAWNING
-        if (currentTime - this.lastCollectibleSpawnTime >= this.nextCollectibleSpawnTime) {
+        // Check if it's time to spawn a new collectible
+        if (this.collectibleSpawnTimer >= this.nextCollectibleSpawnTime) {
             // Don't spawn if we have too many collectibles
             if (this.collectibles.length < this.maxCollectibles) {
                 // Spawn collectible ahead of player in random lane
@@ -2016,12 +2018,12 @@ class BunnyRunnerGame {
                 this.createContinuousCollectible(spawnZ);
             }
             
-            // Set next spawn time
-            this.lastCollectibleSpawnTime = currentTime;
+            // Reset timer and set next spawn interval
+            this.collectibleSpawnTimer = 0;
             this.nextCollectibleSpawnTime = this.getRandomCollectibleInterval();
         }
         
-        // Clean up old collectibles (already handled in cleanupOldObstacles)
+        // Clean up old collectibles (handled in cleanupOldObstacles)
     }
     
     createContinuousCollectible(z) {

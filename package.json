@@ -1,0 +1,15 @@
+{
+  "name": "bunny-runner",
+  "version": "1.0.0",
+  "description": "Bunny Runner - Cute Endless Adventure 3D Game",
+  "scripts": {
+    "dev": "python3 -m http.server 8080",
+    "start": "python3 -m http.server 8080"
+  },
+  "keywords": [
+    "threejs",
+    "game",
+    "endless-runner"
+  ],
+  "license": "MIT"
+}
