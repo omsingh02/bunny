@@ -22,7 +22,8 @@ class BunnyRunnerGame {
         this.jumpVelocity = 0;
         this.isJumping = false;
         this.jumpPower = 18;
-        this.gravity = 0.9;
+        // Gravity is acceleration (units/sec²), so original per-frame 0.015 * 60² = 54
+        this.gravity = 54;
         
         // Time accumulator for frame-rate independent scoring
         this.scoreTimer = 0;
@@ -133,6 +134,7 @@ class BunnyRunnerGame {
         this.maxComboThisRun = 0;
         this.obstacleHitsThisRun = 0;
         
+        window.game = this;
         this.init();
     }
     
@@ -489,6 +491,11 @@ class BunnyRunnerGame {
         }, 300); // 300ms cooldown
         
         this.musicEnabled = !this.musicEnabled;
+        this.settings.musicEnabled = this.musicEnabled;
+        this.saveSettings();
+        const musicToggleSetting = document.getElementById('music-setting');
+        if (musicToggleSetting) musicToggleSetting.checked = this.musicEnabled;
+        
         const musicBtn = document.getElementById('music-toggle');
         
         if (this.musicEnabled) {
@@ -576,7 +583,7 @@ class BunnyRunnerGame {
             
             this.audioEnabled = true;
             
-            if (this.musicEnabled) {
+            if (this.musicEnabled && this.gameState === 'playing') {
                 this.startBackgroundMusic();
             }
         } catch (error) {
@@ -1333,6 +1340,9 @@ class BunnyRunnerGame {
         
         // Start countdown before gameplay
         await this.startCountdown();
+        
+        // Reset the clock to prevent large deltaTime from countdown
+        this.clock.getDelta();
         
         // Now actually start the game
         this.gameState = 'playing';
@@ -2758,7 +2768,7 @@ return [];
     setupPWA() {
         // Register service worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
+            navigator.serviceWorker.register('assets/scripts/sw.js')
                 .then((registration) => {
 
                 })
