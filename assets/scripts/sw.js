@@ -12,6 +12,7 @@ const urlsToCache = [
   '/assets/scripts/modules/ParticleSystem.js',
   '/assets/scripts/modules/StorageManager.js',
   '/assets/scripts/modules/UIController.js',
+  '/assets/scripts/modules/AnalyticsManager.js',
   '/assets/manifest.json',
   '/assets/icons/favicon.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'

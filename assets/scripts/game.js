@@ -9,6 +9,7 @@ import { PhysicsEngine } from "./modules/PhysicsEngine.js";
 import { WorldManager } from "./modules/WorldManager.js";
 import { InputController } from "./modules/InputController.js";
 import { UIController } from "./modules/UIController.js";
+import { AnalyticsManager } from "./modules/AnalyticsManager.js";
 
 export class BunnyRunnerGame {
     constructor() {
@@ -161,6 +162,7 @@ export class BunnyRunnerGame {
 
             this.input.init();
             this.ui.init();
+            AnalyticsManager.init();
             this.applySettings();
             this.setupPWA();
 
@@ -299,12 +301,12 @@ export class BunnyRunnerGame {
             this.startBackgroundMusic();
         }
 
-        if (typeof umami !== "undefined") {
-            umami.track("game-start", {
-                difficulty: this.selectedDifficulty,
-                platform: this.isMobile ? "mobile" : "desktop"
-            });
-        }
+        this.gemsCollectedThisRun = 0;
+        AnalyticsManager.trackGameStart({
+            difficulty: this.selectedDifficulty,
+            platform: this.isMobile ? "mobile" : "desktop",
+            audioEnabled: this.settings.soundEnabled || this.audio.audioEnabled
+        });
 
         await this.ui.startCountdown();
         this.gameState = "playing";
@@ -353,7 +355,7 @@ export class BunnyRunnerGame {
         }
     }
 
-    gameOver() {
+    gameOver(cause = "obstacle") {
         this.gameState = "gameOver";
         this.stopBackgroundMusic();
         if (this.audio.soundEffects?.gameOver) this.audio.soundEffects.gameOver();
@@ -362,7 +364,17 @@ export class BunnyRunnerGame {
         if (isNewBest) {
             this.bestScore = this.score;
             StorageManager.saveBestScore(this.bestScore);
+            AnalyticsManager.trackHighScore(this.score, this.selectedDifficulty);
         }
+
+        AnalyticsManager.trackGameOver({
+            difficulty: this.selectedDifficulty,
+            score: this.score,
+            gems: this.gemsCollectedThisRun || 0,
+            cause,
+            maxCombo: this.maxComboThisRun || 1,
+            isNewBest
+        });
 
         this.leaderboard = StorageManager.addToLeaderboard(this.leaderboard, this.score, this.selectedDifficulty);
         this.saveSettings();
@@ -437,7 +449,8 @@ export class BunnyRunnerGame {
             if (collision.type === "obstacle") {
                 this.obstacleHitsThisRun++;
                 this.input.triggerHapticFeedback("heavy");
-                this.gameOver();
+                const cause = collision.obstacle?.userData?.obstacleType || "obstacle";
+                this.gameOver(cause);
             } else if (collision.type === "collectible") {
                 this.collectWithCombo();
                 this.input.triggerHapticFeedback("success");
@@ -460,6 +473,7 @@ export class BunnyRunnerGame {
             this.comboCount = 1;
         }
         this.lastComboTime = now;
+        this.gemsCollectedThisRun = (this.gemsCollectedThisRun || 0) + 1;
         if (this.comboCount > this.maxComboThisRun) this.maxComboThisRun = this.comboCount;
 
         const pts = 10 * this.comboCount;
@@ -549,8 +563,12 @@ export class BunnyRunnerGame {
         const diffs = ["easy", "medium", "hard"];
         const curIdx = diffs.indexOf(this.selectedDifficulty);
         const newIdx = Math.max(0, Math.min(diffs.length - 1, curIdx + dir));
-        this.selectedDifficulty = diffs[newIdx];
-        this.ui.updateDifficultyDisplay();
+        if (newIdx !== curIdx) {
+            const prev = this.selectedDifficulty;
+            this.selectedDifficulty = diffs[newIdx];
+            AnalyticsManager.trackDifficultyChange(prev, this.selectedDifficulty);
+            this.ui.updateDifficultyDisplay();
+        }
     }
 
     applyDifficultySettings() {
@@ -591,6 +609,9 @@ export class BunnyRunnerGame {
         if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
             navigator.serviceWorker.register("assets/scripts/sw.js").catch(() => {});
         }
+        window.addEventListener("appinstalled", () => {
+            AnalyticsManager.trackPwaInstalled(this.isMobile ? "mobile" : "desktop");
+        });
     }
 }
 
