@@ -6,10 +6,12 @@
     <title>Bunny Runner - Cute Endless Adventure! 🐰✨</title>
     <meta name="description" content="The cutest endless runner game ever! Help bunny hop through obstacles and collect gems! 🐰✨">
     <meta name="theme-color" content="#DDA0DD">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
     <link rel="manifest" href="assets/manifest.json">
-    <link rel="stylesheet" href="assets/styles/desktop.css">
-    <script src="assets/scripts/redirect.js"></script>
+    <link rel="stylesheet" href="assets/styles/game.css">
     
     <!-- Analytics: Umami (privacy-respecting, self-hosted) -->
     <script defer src="https://a.omsingh.me/script.js" data-website-id="963b69b0-0203-41a7-9c6d-b9820da37c47"></script>
@@ -219,8 +221,9 @@
                         <button id="music-toggle" class="btn btn--icon" title="Mute Music">
                             <span style="font-weight: bold;">♫</span>
                         </button>
-                        <button id="pause-btn" class="btn btn--sm">
-                            <span style="font-weight: bold;">‖ PAUSE</span>
+                        <button id="pause-btn" class="btn btn--secondary btn--sm" title="Pause Game">
+                            <span class="pause-text-full" style="font-weight: bold;">‖ PAUSE</span>
+                            <span class="pause-text-short" style="font-weight: bold;">‖</span>
                         </button>
                     </div>
                 </div>
@@ -369,7 +372,7 @@
     <!-- Audio is now handled by Three.js Audio system -->
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="assets/scripts/desktop.js"></script>
+    <script type="module" src="assets/scripts/game.js"></script>
     <script>
         // Register service worker
         if ('serviceWorker' in navigator) {

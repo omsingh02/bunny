@@ -1,9 +1,17 @@
-const CACHE_NAME = 'bunny-runner-v1';
+const CACHE_NAME = 'bunny-runner-v2';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/assets/styles/desktop.css',
-  '/assets/scripts/desktop.js',
+  '/assets/styles/game.css',
+  '/assets/scripts/game.js',
+  '/assets/scripts/modules/AudioSynth.js',
+  '/assets/scripts/modules/ProceduralModels.js',
+  '/assets/scripts/modules/PhysicsEngine.js',
+  '/assets/scripts/modules/WorldManager.js',
+  '/assets/scripts/modules/InputController.js',
+  '/assets/scripts/modules/ParticleSystem.js',
+  '/assets/scripts/modules/StorageManager.js',
+  '/assets/scripts/modules/UIController.js',
   '/assets/manifest.json',
   '/assets/icons/favicon.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'

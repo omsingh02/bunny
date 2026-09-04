@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="icon" type="image/svg+xml" href="../assets/icons/favicon-mobile.svg">
     <link rel="manifest" href="../assets/manifest-mobile.json">
-    <link rel="stylesheet" href="../assets/styles/mobile.css">
+    <link rel="stylesheet" href="../assets/styles/game.css">
     <script src="../assets/scripts/redirect.js"></script>
     
     <!-- Analytics: Umami (privacy-respecting, self-hosted) -->
@@ -203,7 +203,7 @@
                         <button id="music-toggle" class="btn btn--icon" title="Music">
                             <span style="font-size: 1.2rem; font-weight: bold;">♫</span>
                         </button>
-                        <button id="pause-btn" class="btn btn--sm">
+                        <button id="pause-btn" class="btn btn--icon" title="Pause">
                             <span style="font-size: 1.4rem; font-weight: bold;">‖</span>
                         </button>
                     </div>
@@ -331,7 +331,7 @@
     </div>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="../assets/scripts/mobile.js"></script>
+    <script type="module" src="../assets/scripts/game.js"></script>
     <script>
         // Register service worker
         if ('serviceWorker' in navigator) {
