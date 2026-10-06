@@ -228,7 +228,7 @@ The live site also sends anonymous usage stats to a self-hosted [Umami](https://
 
 ## 🤝 Contributing
 
-Bug reports, ideas and pull requests are welcome: [open an issue](https://github.com/omsingh02/bunny/issues). The short version is in [CONTRIBUTING.md](CONTRIBUTING.md): run `npm test` before sending a PR, and keep the game **simple, fast and cute** 🐰 (no frameworks, no build tooling).
+Bug reports, ideas and pull requests are welcome: [open an issue](https://github.com/omsingh02/bunny/issues). The short version is in [CONTRIBUTING.md](CONTRIBUTING.md): run `npm test` before sending a PR, and keep the game **simple, fast and cute** 🐰 (no frameworks, no build tooling). Everyone is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## 📄 License
 

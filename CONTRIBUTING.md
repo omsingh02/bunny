@@ -2,6 +2,8 @@
 
 Thanks for helping! The goal is a game that stays **simple, fast and cute**: plain JavaScript modules, no frameworks, no build step, no asset files.
 
+Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md). In short: be kind.
+
 ## Run it
 
 ```bash
