@@ -1,4 +1,8 @@
-// ProceduralModels.js - High-Performance Pooled Geometries & Asset Generators
+// ProceduralModels.js - every 3D model is built from primitives.
+// Obstacles, treats and decorations all share one set of geometries/materials (the "pools"),
+// so removing one from the scene never disposes anything.
+export const GROUND_WIDTH = 24; // wide enough for the meadow decorations on both sides of the track
+
 export class ProceduralModels {
     static pools = null;
 
@@ -41,27 +45,10 @@ export class ProceduralModels {
         };
     }
 
-    static disposeHierarchy(obj) {
-        if (!obj) return;
-        // Do not dispose static pooled geometries/materials as they are reused across the entire session
-        if (obj.userData?.isPooled) return;
-
-        obj.traverse((child) => {
-            if (child.userData?.isPooled) return;
-            if (child.geometry && !child.geometry.userData?.isPooled) child.geometry.dispose();
-            if (child.material) {
-                const mats = Array.isArray(child.material) ? child.material : [child.material];
-                mats.forEach(m => {
-                    if (!m.userData?.isPooled) m.dispose();
-                });
-            }
-        });
-    }
-
     static createGround(lanes) {
         const group = new THREE.Group();
 
-        const groundGeometry = new THREE.PlaneGeometry(10, 200);
+        const groundGeometry = new THREE.PlaneGeometry(GROUND_WIDTH, 200);
         const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x98FB98 });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
@@ -162,7 +149,6 @@ export class ProceduralModels {
         ProceduralModels.initPools();
         const p = ProceduralModels.pools;
         const flowerGroup = new THREE.Group();
-        flowerGroup.userData = { isPooled: true };
 
         const stem = new THREE.Mesh(p.geometries.stem, p.materials.stem);
         stem.position.y = 0.75;
@@ -189,7 +175,6 @@ export class ProceduralModels {
         ProceduralModels.initPools();
         const p = ProceduralModels.pools;
         const log = new THREE.Mesh(p.geometries.log, p.materials.log);
-        log.userData = { isPooled: true };
         log.rotation.z = Math.PI / 2;
         log.position.y = 0.3;
         log.castShadow = true;
@@ -200,7 +185,6 @@ export class ProceduralModels {
         ProceduralModels.initPools();
         const p = ProceduralModels.pools;
         const rock = new THREE.Mesh(p.geometries.rock, p.materials.rock);
-        rock.userData = { isPooled: true };
         rock.position.y = 0.5;
         rock.rotation.x = Math.random() * Math.PI;
         rock.rotation.y = Math.random() * Math.PI;
@@ -212,7 +196,6 @@ export class ProceduralModels {
         ProceduralModels.initPools();
         const p = ProceduralModels.pools;
         const heartGroup = new THREE.Group();
-        heartGroup.userData = { isPooled: true };
 
         const left = new THREE.Mesh(p.geometries.heartCurve, p.materials.heart);
         left.position.set(-0.1, 0.1, 0);
@@ -236,7 +219,6 @@ export class ProceduralModels {
         ProceduralModels.initPools();
         const p = ProceduralModels.pools;
         const starGroup = new THREE.Group();
-        starGroup.userData = { isPooled: true };
 
         for (let i = 0; i < 5; i++) {
             const ray = new THREE.Mesh(p.geometries.starRay, p.materials.star);
@@ -256,7 +238,6 @@ export class ProceduralModels {
         ProceduralModels.initPools();
         const p = ProceduralModels.pools;
         const plushGroup = new THREE.Group();
-        plushGroup.userData = { isPooled: true };
 
         const body = new THREE.Mesh(p.geometries.plushBody, p.materials.plush);
         plushGroup.add(body);

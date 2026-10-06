@@ -1,135 +1,88 @@
 # 🐰 Bunny Runner - Cute Endless Adventure
 
-A delightful 3D endless runner game built with Three.js featuring an adorable bunny character, intuitive controls, and engaging gameplay mechanics.
+A small, cute 3D endless runner built with Three.js. Hop between three lanes, jump over flowers, logs and rocks, and collect hearts, stars and bunny plushies.
 
 ## 🎮 Features
 
-- **3D Graphics**: Powered by Three.js for smooth WebGL rendering
-- **Responsive Design**: Optimized separate versions for desktop and mobile
-- **Progressive Web App**: Installable with offline support
-- **Touch & Swipe Controls**: Mobile-optimized gesture controls
-- **Combo System**: Multiplier rewards for consecutive collectibles
-- **Achievements**: Unlock rewards and track progress
-- **Leaderboard**: Track top scores across difficulty levels
-- **Difficulty Modes**: Easy, Medium, Hard with different speeds and challenges
+- **3D graphics** with Three.js (r128, loaded from a CDN) - all models are built from primitives, no asset files
+- **One page for every screen size**: keyboard on desktop, buttons + swipes on phones
+- **Combos**: grab treats back to back (3 second window) for up to a 10x multiplier
+- **Milestones, achievements and a leaderboard** (top 10 per difficulty), all saved in your browser
+- **Three difficulties**: Easy, Medium, Hard
+- **Procedural sound**: every sound effect and the background tune are synthesized with the Web Audio API
 
-## 📁 Project Structure
+## 🚀 Run it
 
-```
-cute-runner-game/
-├── index.html                  # Desktop game entry point
-├── mobile/
-│   └── index.html             # Mobile game entry point
-├── assets/
-│   ├── icons/
-│   │   ├── favicon.svg        # Desktop favicon
-│   │   └── favicon-mobile.svg # Mobile favicon
-│   ├── scripts/
-│   │   ├── desktop.js         # Desktop game logic
-│   │   ├── mobile.js          # Mobile game logic
-│   │   ├── redirect.js        # Device detection & routing
-│   │   ├── sw.js              # Desktop service worker
-│   │   └── sw-mobile.js       # Mobile service worker
-│   ├── styles/
-│   │   ├── desktop.css        # Desktop styles
-│   │   └── mobile.css         # Mobile styles
-│   ├── manifest.json          # Desktop PWA manifest
-│   └── manifest-mobile.json   # Mobile PWA manifest
-├── docs/
-│   └── CHANGELOG.md           # Version history and changes
-└── .github/
-    └── copilot-instructions.md # AI agent development guidelines
+It's a static site. Serve the folder with anything:
+
+```bash
+npm start            # python3 -m http.server 8080  ->  http://localhost:8080
 ```
 
-## 🚀 Getting Started
+## 🕹️ Controls
 
-### Running Locally
+| | Move | Jump | Pause |
+|---|---|---|---|
+| Keyboard | ← → or A D | Space, ↑ or W | Esc |
+| Phone | swipe left/right, or the arrow buttons | swipe up, tap, or the ↑ button | the ‖ button |
 
-1. Clone or download this repository
-2. Serve the files using any static file server:
-   ```bash
-   # Using Python
-   python -m http.server 8000
-   
-   # Using Node.js http-server
-   npx http-server
-   
-   # Using PHP
-   php -S localhost:8000
-   ```
-3. Open `http://localhost:8000` in your browser
-4. The game automatically detects your device and redirects to the appropriate version
+The game also pauses by itself when you switch tabs or apps.
 
-### Desktop Controls
+## 🎯 How it plays
 
-- **Arrow Keys / A,D**: Move between lanes
-- **Space / Arrow Up**: Jump
-- **Escape**: Pause game
+- Distance earns points, treats are worth 10 each times your combo (up to 10x).
+- The game speeds up as your score grows, up to a top speed per difficulty.
+- Milestones at 100, 250, 500, 750, 1000, 1500, 2000, 3000 and 5000 points.
 
-### Mobile Controls
+| Difficulty | Name | Feel |
+|---|---|---|
+| Easy | Relaxed Garden Stroll | slow, few obstacles |
+| Medium | Bunny Hop Fun | the classic |
+| Hard | Speedy Meadow Dash | fast and busy |
 
-- **Touch Buttons**: Left, Right, Jump at bottom of screen
-- **Swipe Gestures**: 
-  - Swipe Left/Right to change lanes
-  - Swipe Up to jump
-  - Quick tap anywhere to jump
+## 📁 Project layout
 
-## 🎯 Game Mechanics
+```
+index.html                 the whole game UI (all screens live here)
+assets/
+  scripts/game.js          game state, scoring and the main loop
+  scripts/modules/         AudioSynth, ProceduralModels, WorldManager, PhysicsEngine,
+                           ParticleSystem, InputController, UIController,
+                           StorageManager, AnalyticsManager, dom
+  styles/game.css          all the styling (pastel theme via CSS custom properties)
+  fonts/                   self-hosted Inter
+  icons/                   favicon.svg + PNG icons (generated, see below)
+  screenshots/             install-dialog screenshots (generated)
+  manifest.json            home-screen install info
+favicon.ico, preview.png   tab icon and the link-preview image (generated)
+404.html, robots.txt, sitemap.xml, CNAME, .nojekyll   GitHub Pages / SEO basics
+mobile/index.html          just redirects to index.html (old links keep working)
+scripts/make-assets.mjs    regenerates all the images
+tests/                     npm test (see below)
+```
 
-### Scoring
-- Base points for distance traveled
-- Collectible gems: 10 points each
-- Combo multiplier: Up to 10x for consecutive collections
-- Milestone celebrations at 100, 250, 500, 750, 1000+
+## 🖼️ Icons, preview image and screenshots
 
-### Difficulty Levels
-- **Easy**: Relaxed Garden Stroll - Slower pace for beginners
-- **Medium**: Happy Run - Balanced challenge
-- **Hard**: Speed Bunny Challenge - Fast-paced expert mode
+Every image is generated, so a change to the bunny drawing or the look of the game is one command:
 
-### Achievements
-- Baby Steps: Make your first jump
-- Century Run: Reach 100 points
-- Half Marathon: Reach 500 points
-- Legend: Reach 1000 points
-- Combo Master: 5x combo streak
-- Combo God: 10x combo streak
-- Dodging Expert: Score 50 without hitting obstacles
-- Speed Demon: Reach maximum speed
+```bash
+npm run assets               # everything
+npm run assets icons         # favicon.svg/.ico, apple-touch-icon, PWA icons (any + maskable)
+npm run assets screenshots   # preview.png (1200x630 link card) + the install screenshots
+```
 
-## 🛠️ Technology Stack
+The bunny icon is drawn in `scripts/make-assets.mjs`; the screenshots are real frames of the game.
+Needs `chromium` (and internet for Three.js, or `THREE_JS=/path/to/three.min.js`); `optipng` is used if installed.
 
-- **Three.js r128**: 3D graphics rendering
-- **Vanilla JavaScript**: No framework dependencies
-- **CSS3**: Modern styling with custom properties
-- **Web Audio API**: Procedural sound effects and music
-- **Service Workers**: PWA offline capabilities
-- **LocalStorage**: Settings and progress persistence
+## 🧪 Tests
 
-## 📱 PWA Features
+```bash
+npm test
+```
 
-- Installable on desktop and mobile devices
-- Offline play support
-- Fullscreen mode
-- Custom app icons
-- Native-like experience
-
-## 🎨 Customization
-
-The game uses CSS custom properties for easy theming. Key variables in styles:
-- `--color-pink`, `--color-lavender`, `--color-mint`: Theme colors
-- `--font-size-*`: Typography scale
-- `--space-*`: Spacing system
-- `--radius-*`: Border radius values
+- `tests/wiring.mjs` - instant, no browser: checks every element id the JS looks up exists in `index.html`, every file the pages, manifest and CSS reference exists (with the right image sizes), the link-preview/canonical/sitemap tags agree with `CNAME`, and the leaderboard logic.
+- `tests/smoke.mjs` - opens the game in headless Chromium and clicks through menu, difficulty, play, pause, settings and game over. Needs `chromium` on your PATH and internet for Three.js (or `THREE_JS=/path/to/three.min.js npm test` to run offline).
 
 ## 📄 License
 
 This project is open source and available for personal and educational use.
-
-## 🤝 Contributing
-
-Feel free to submit issues, fork the repository, and create pull requests for any improvements.
-
-## 🙏 Credits
-
-Built with ❤️ using Three.js and modern web technologies.

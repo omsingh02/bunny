@@ -1,77 +1,62 @@
-// ParticleSystem.js - Procedural Particle & Visual FX Subsystem
-import { ProceduralModels } from './ProceduralModels.js';
-
+// ParticleSystem.js - the little sparkle burst when you grab a treat
 export class ParticleSystem {
     constructor(scene) {
         this.scene = scene;
-        this.particles = [];
+        this.bursts = [];
+        this.geometry = new THREE.SphereGeometry(0.05, 4, 4); // shared by every sparkle, never disposed
     }
 
     createSparkleEffect(position, enabled = true) {
         if (!enabled) return;
 
-        const sparkleGroup = new THREE.Group();
+        const burst = new THREE.Group();
+        burst.userData.life = 1;
 
         for (let i = 0; i < 8; i++) {
-            const sparkleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
-            const sparkleMaterial = new THREE.MeshLambertMaterial({
+            const material = new THREE.MeshLambertMaterial({
                 color: new THREE.Color().setHSL(Math.random(), 1, 0.7),
-                transparent: true,
-                opacity: 1
+                transparent: true
             });
-
-            const sparkle = new THREE.Mesh(sparkleGeometry, sparkleMaterial);
+            const sparkle = new THREE.Mesh(this.geometry, material);
             sparkle.position.copy(position);
-
-            sparkle.userData = {
-                velocity: new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.2,
-                    Math.random() * 0.3 + 0.1,
-                    (Math.random() - 0.5) * 0.2
-                ),
-                life: 1.0,
-                geometry: sparkleGeometry,
-                material: sparkleMaterial
-            };
-
-            sparkleGroup.add(sparkle);
+            sparkle.userData.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.2,
+                Math.random() * 0.3 + 0.1,
+                (Math.random() - 0.5) * 0.2
+            );
+            burst.add(sparkle);
         }
 
-        sparkleGroup.userData = { type: 'sparkle', life: 1.0 };
-        this.particles.push(sparkleGroup);
-        this.scene.add(sparkleGroup);
+        this.bursts.push(burst);
+        this.scene.add(burst);
     }
 
-    update(deltaTime = 0.016) {
-        const timeScale = deltaTime * 60;
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const particle = this.particles[i];
+    update(deltaTime) {
+        const timeScale = deltaTime * 60; // the tuning below is per-frame at 60fps
+        for (let i = this.bursts.length - 1; i >= 0; i--) {
+            const burst = this.bursts[i];
+            burst.userData.life -= 0.05 * timeScale;
 
-            if (particle.userData.type === 'sparkle') {
-                particle.userData.life -= 0.05 * timeScale;
-
-                particle.children.forEach(sparkle => {
-                    sparkle.position.x += sparkle.userData.velocity.x * timeScale;
-                    sparkle.position.y += sparkle.userData.velocity.y * timeScale;
-                    sparkle.position.z += sparkle.userData.velocity.z * timeScale;
-                    sparkle.userData.velocity.y -= 0.01 * timeScale;
-                    sparkle.material.opacity = Math.max(0, particle.userData.life);
-                });
-
-                if (particle.userData.life <= 0) {
-                    ProceduralModels.disposeHierarchy(particle);
-                    this.scene.remove(particle);
-                    this.particles.splice(i, 1);
-                }
+            for (const sparkle of burst.children) {
+                const v = sparkle.userData.velocity;
+                sparkle.position.x += v.x * timeScale;
+                sparkle.position.y += v.y * timeScale;
+                sparkle.position.z += v.z * timeScale;
+                v.y -= 0.01 * timeScale;
+                sparkle.material.opacity = Math.max(0, burst.userData.life);
             }
+
+            if (burst.userData.life <= 0) this.remove(i);
         }
+    }
+
+    remove(index) {
+        const [burst] = this.bursts.splice(index, 1);
+        this.scene.remove(burst);
+        burst.children.forEach(sparkle => sparkle.material.dispose()); // materials are per-sparkle (own colour)
     }
 
     clear() {
-        this.particles.forEach(p => {
-            ProceduralModels.disposeHierarchy(p);
-            this.scene.remove(p);
-        });
-        this.particles = [];
+        for (let i = this.bursts.length - 1; i >= 0; i--) this.remove(i);
     }
 }

@@ -1,185 +1,129 @@
-// InputController.js - Unified Keyboard, Touch & Haptic Input Subsystem
+// InputController.js - keyboard, touch buttons, swipes and vibration
+import { $ } from './dom.js';
+
+const HAPTICS = { light: 15, medium: 30, heavy: [50, 50, 50], success: [20, 30, 20] };
+
 export class InputController {
     constructor(game) {
         this.game = game;
-        this.keys = {};
-        this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     }
 
     init() {
         this.setupKeyboard();
-        this.setupTouchControls();
+        if (this.game.isTouchDevice) this.setupTouchControls();
     }
 
     triggerHapticFeedback(intensity = 'light') {
-        if (!this.game.settings?.hapticEnabled || !navigator.vibrate) return;
-        switch (intensity) {
-            case 'light': navigator.vibrate(15); break;
-            case 'medium': navigator.vibrate(30); break;
-            case 'heavy': navigator.vibrate([50, 50, 50]); break;
-            case 'success': navigator.vibrate([20, 30, 20]); break;
-            default: navigator.vibrate(20);
-        }
+        if (!this.game.settings.hapticEnabled || !navigator.vibrate) return;
+        navigator.vibrate(HAPTICS[intensity] ?? 20);
     }
 
     setupKeyboard() {
         document.addEventListener('keydown', (e) => {
-            this.keys[e.code] = true;
+            if (this.game.gameState !== 'playing') return;
 
-            if (this.game.gameState === 'playing') {
-                if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+            switch (e.code) {
+                case 'ArrowLeft':
+                case 'KeyA':
                     this.game.moveLane(-1);
-                }
-                if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
                     this.game.moveLane(1);
-                }
-                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+                    break;
+                case 'Space':
+                case 'ArrowUp':
+                case 'KeyW':
                     e.preventDefault();
                     this.game.jump();
-                }
-                if (e.code === 'Escape') {
+                    break;
+                case 'Escape':
                     this.game.pauseGame();
-                }
+                    break;
             }
-        });
-
-        document.addEventListener('keyup', (e) => {
-            this.keys[e.code] = false;
         });
     }
 
     setupTouchControls() {
-        if (!this.isTouchDevice) return;
+        const game = this.game;
+        const buttons = {
+            'touch-left': ['light', () => game.moveLane(-1)],
+            'touch-right': ['light', () => game.moveLane(1)],
+            'touch-jump': ['medium', () => game.jump()]
+        };
 
-        const touchLeft = document.getElementById('touch-left');
-        const touchRight = document.getElementById('touch-right');
-        const touchJump = document.getElementById('touch-jump');
-
-        if (touchLeft && touchRight && touchJump) {
-            [touchLeft, touchRight, touchJump].forEach(btn => {
-                btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    btn.style.transform = 'scale(0.9)';
-                });
-                btn.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    btn.style.transform = '';
-                });
-            });
-
-            touchLeft.addEventListener('touchstart', (e) => {
+        for (const [id, [haptic, action]] of Object.entries(buttons)) {
+            const button = $(id);
+            button.addEventListener('touchstart', (e) => {
                 e.preventDefault();
-                if (this.game.gameState === 'playing') {
-                    this.triggerHapticFeedback('light');
-                    this.game.moveLane(-1);
+                button.style.transform = 'scale(0.9)';
+                if (game.gameState === 'playing') {
+                    this.triggerHapticFeedback(haptic);
+                    action();
                 }
             });
-
-            touchRight.addEventListener('touchstart', (e) => {
+            button.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                if (this.game.gameState === 'playing') {
-                    this.triggerHapticFeedback('light');
-                    this.game.moveLane(1);
-                }
+                button.style.transform = '';
             });
-
-            touchJump.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (this.game.gameState === 'playing') {
-                    this.triggerHapticFeedback('medium');
-                    this.game.jump();
-                }
+            button.addEventListener('touchcancel', () => {
+                button.style.transform = '';
             });
         }
 
         this.setupSwipeGestures();
     }
 
+    // Swipe left/right = change lane, swipe up = jump, quick tap anywhere = jump
     setupSwipeGestures() {
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let touchStartTime = 0;
-        let isSwiping = false;
-        let touchIdentifier = null;
-
-        const minSwipeDistance = 50;
-        const maxTapDuration = 150;
+        let touch = null; // the finger we're tracking: { id, x, y, time, swiping }
+        const playing = () => this.game.gameState === 'playing';
+        const tracked = (list) => touch && Array.from(list).find(t => t.identifier === touch.id);
 
         document.addEventListener('touchstart', (e) => {
-            if (this.game.gameState !== 'playing') return;
-
-            const touch = e.touches[0];
-            const element = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (element && (element.closest('.touch-controls') || element.closest('.hud-top'))) {
-                return;
-            }
-
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-            touchStartTime = Date.now();
-            touchIdentifier = touch.identifier;
-            isSwiping = false;
-        }, { passive: false });
+            if (!playing()) return;
+            const t = e.changedTouches[0];
+            // the on-screen buttons and the top bar handle their own touches
+            if (document.elementFromPoint(t.clientX, t.clientY)?.closest('.touch-controls, .hud-top')) return;
+            touch = { id: t.identifier, x: t.clientX, y: t.clientY, time: Date.now(), swiping: false };
+        });
 
         document.addEventListener('touchmove', (e) => {
-            if (this.game.gameState !== 'playing' || touchIdentifier === null) return;
-
-            const touch = Array.from(e.touches).find(t => t.identifier === touchIdentifier);
-            if (!touch) return;
-
-            const deltaX = Math.abs(touch.clientX - touchStartX);
-            const deltaY = Math.abs(touch.clientY - touchStartY);
-
-            if (deltaX > 10 || deltaY > 10) {
-                isSwiping = true;
-                e.preventDefault();
+            const t = playing() && tracked(e.touches);
+            if (!t) return;
+            if (Math.abs(t.clientX - touch.x) > 10 || Math.abs(t.clientY - touch.y) > 10) {
+                touch.swiping = true;
+                e.preventDefault(); // stop the page from scrolling under the swipe
             }
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
-            if (this.game.gameState !== 'playing' || touchIdentifier === null) return;
+            const t = playing() && tracked(e.changedTouches);
+            if (!t) return;
 
-            const touch = Array.from(e.changedTouches).find(t => t.identifier === touchIdentifier);
-            if (!touch) return;
+            const dx = t.clientX - touch.x;
+            const dy = t.clientY - touch.y;
+            const { swiping, time } = touch;
+            touch = null;
 
-            const touchEndX = touch.clientX;
-            const touchEndY = touch.clientY;
-            const touchDuration = Date.now() - touchStartTime;
-
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-            touchIdentifier = null;
-
-            if (isSwiping) {
-                this.handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY, minSwipeDistance);
-            } else if (touchDuration < maxTapDuration && distance < 20) {
+            if (swiping) {
+                this.handleSwipe(dx, dy);
+            } else if (Date.now() - time < 150 && Math.hypot(dx, dy) < 20) {
                 this.game.jump();
                 this.triggerHapticFeedback('light');
             }
         });
     }
 
-    handleSwipe(startX, startY, endX, endY, minDistance) {
-        const deltaX = endX - startX;
-        const deltaY = endY - startY;
-        const absDeltaX = Math.abs(deltaX);
-        const absDeltaY = Math.abs(deltaY);
-
-        if (absDeltaX > minDistance || absDeltaY > minDistance) {
-            if (absDeltaX > absDeltaY) {
-                if (deltaX > 0) {
-                    this.game.moveLane(1);
-                    this.triggerHapticFeedback('light');
-                } else {
-                    this.game.moveLane(-1);
-                    this.triggerHapticFeedback('light');
-                }
-            } else if (deltaY < -minDistance) {
-                this.game.jump();
-                this.triggerHapticFeedback('medium');
-            }
+    handleSwipe(dx, dy) {
+        const minDistance = 50;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (Math.abs(dx) < minDistance) return;
+            this.game.moveLane(dx > 0 ? 1 : -1);
+            this.triggerHapticFeedback('light');
+        } else if (dy < -minDistance) {
+            this.game.jump();
+            this.triggerHapticFeedback('medium');
         }
     }
 }

@@ -1,5 +1,22 @@
-// WorldManager.js - Procedural Chunk Generation, Continuous Spawning & GPU Memory Disposal
-import { ProceduralModels } from './ProceduralModels.js';
+// WorldManager.js - spawns obstacles, treats and scenery, scrolls them toward the bunny,
+// and removes them once they're behind it. All models share pooled geometry (see ProceduralModels),
+// so removing something from the scene is all the cleanup it needs.
+import { ProceduralModels, GROUND_WIDTH } from './ProceduralModels.js';
+
+const OBSTACLES = {
+    flower: () => ProceduralModels.createFlower(),
+    log: () => ProceduralModels.createLog(),
+    rock: () => ProceduralModels.createRock()
+};
+
+const TREATS = {
+    heart: () => ProceduralModels.createHeart(),
+    star: () => ProceduralModels.createStar(),
+    bunnyPlush: () => ProceduralModels.createBunnyPlush()
+};
+
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+const randomIn = ([min, max]) => min + Math.random() * (max - min);
 
 export class WorldManager {
     constructor(scene, lanes) {
@@ -10,192 +27,135 @@ export class WorldManager {
         this.collectibles = [];
         this.decorations = [];
 
-        this.obstacleSpawnTimer = 0;
-        this.collectibleSpawnTimer = 0;
-        this.nextObstacleSpawnTime = 1500;
-        this.nextCollectibleSpawnTime = 800;
-        this.obstacleSpawnDistance = 40;
+        this.obstacleSpawnDistance = 40;    // how far ahead of the bunny things appear
         this.collectibleSpawnDistance = 35;
-        this.obstacleRemovalDistance = 10;
+        this.removalDistance = 10;          // obstacles and treats are dropped this far behind it
         this.maxObstacles = 8;
         this.maxCollectibles = 12;
-        this.totalObstaclesSpawned = 0;
-        this.totalCollectiblesSpawned = 0;
+
+        this.resetSpawnTimers();
+    }
+
+    resetSpawnTimers() {
+        this.obstacleTimer = 0;             // ms since the last spawn
+        this.collectibleTimer = 0;
+        this.nextObstacleIn = 1500;         // ms until the next one
+        this.nextCollectibleIn = 800;
     }
 
     createObstacle(z) {
         if (this.obstacles.length >= this.maxObstacles) return;
 
-        const lane = Math.floor(Math.random() * 3);
-        const x = this.lanes[lane];
-        const types = ['flower', 'log', 'rock'];
-        const type = types[Math.floor(Math.random() * types.length)];
+        const lane = Math.floor(Math.random() * this.lanes.length);
+        const type = pick(Object.keys(OBSTACLES));
+        const obstacle = OBSTACLES[type]();
 
-        let obstacle;
-        if (type === 'flower') obstacle = ProceduralModels.createFlower();
-        else if (type === 'log') obstacle = ProceduralModels.createLog();
-        else obstacle = ProceduralModels.createRock();
-
-        obstacle.position.set(x, 0, z);
-        obstacle.userData = {
-            type: 'obstacle',
-            obstacleType: type,
-            lane: lane,
-            spawnTime: Date.now()
-        };
+        obstacle.position.set(this.lanes[lane], 0, z);
+        obstacle.userData = { obstacleType: type, lane };
 
         this.obstacles.push(obstacle);
         this.scene.add(obstacle);
-        this.totalObstaclesSpawned++;
     }
 
-    createContinuousCollectible(z) {
-        let availableLanes = [0, 1, 2];
-        this.obstacles.forEach(obstacle => {
-            const dist = Math.abs(obstacle.position.z - z);
-            if (dist < 5 && obstacle.userData.lane !== undefined) {
-                const idx = availableLanes.indexOf(obstacle.userData.lane);
-                if (idx > -1) availableLanes.splice(idx, 1);
-            }
-        });
-        if (availableLanes.length === 0) availableLanes = [0, 1, 2];
+    createCollectible(z) {
+        // keep treats out of lanes that have an obstacle right there
+        const blocked = new Set(
+            this.obstacles.filter(o => Math.abs(o.position.z - z) < 5).map(o => o.userData.lane)
+        );
+        const allLanes = this.lanes.map((_, i) => i);
+        const free = allLanes.filter(i => !blocked.has(i));
+        const lane = pick(free.length ? free : allLanes);
 
-        const lane = availableLanes[Math.floor(Math.random() * availableLanes.length)];
-        const x = this.lanes[lane];
-        const types = ['heart', 'star', 'bunnyPlush'];
-        const type = types[Math.floor(Math.random() * types.length)];
-
-        let collectible;
-        if (type === 'heart') collectible = ProceduralModels.createHeart();
-        else if (type === 'star') collectible = ProceduralModels.createStar();
-        else collectible = ProceduralModels.createBunnyPlush();
-
-        collectible.position.set(x, 1.5, z);
-        collectible.userData = {
-            type: 'collectible',
-            subType: type,
-            lane: lane,
-            spawnTime: Date.now()
-        };
+        const collectible = TREATS[pick(Object.keys(TREATS))]();
+        collectible.position.set(this.lanes[lane], 1.5, z);
 
         this.collectibles.push(collectible);
         this.scene.add(collectible);
-        this.totalCollectiblesSpawned++;
     }
 
+    removeCollectible(index) {
+        const [collectible] = this.collectibles.splice(index, 1);
+        this.scene.remove(collectible);
+    }
+
+    // Scatters grass and flowers over the meadow on both sides of the track
     generateDecorations(startZ, length) {
+        ProceduralModels.initPools();
+        const { geometries, materials } = ProceduralModels.pools;
+
         for (let i = 0; i < 8; i++) {
-            const x = (Math.random() - 0.5) * 20;
+            const x = (Math.random() - 0.5) * (GROUND_WIDTH - 4);
+            if (Math.abs(x) <= 4) continue; // keep the track itself clear
             const z = startZ - Math.random() * length;
 
-            if (Math.abs(x) > 4) {
-                ProceduralModels.initPools();
-                const isGrass = Math.random() < 0.7;
-                if (isGrass) {
-                    const grass = new THREE.Mesh(
-                        ProceduralModels.pools.geometries.grass,
-                        ProceduralModels.pools.materials.grass
-                    );
-                    grass.userData = { isPooled: true };
-                    grass.position.set(x, 0.25, z);
-                    grass.rotation.y = Math.random() * Math.PI * 2;
-                    this.scene.add(grass);
-                    this.decorations.push(grass);
-                } else {
-                    const flower = ProceduralModels.createFlower();
-                    flower.position.set(x, 0, z);
-                    flower.scale.setScalar(0.7);
-                    this.scene.add(flower);
-                    this.decorations.push(flower);
-                }
+            let decoration;
+            if (Math.random() < 0.7) {
+                decoration = new THREE.Mesh(geometries.grass, materials.grass);
+                decoration.position.set(x, 0.25, z);
+                decoration.rotation.y = Math.random() * Math.PI * 2;
+            } else {
+                decoration = ProceduralModels.createFlower();
+                decoration.position.set(x, 0, z);
+                decoration.scale.setScalar(0.7);
             }
+            this.scene.add(decoration);
+            this.decorations.push(decoration);
         }
-    }
-
-    generateWorldChunk(startZ) {
-        this.generateDecorations(startZ, 20);
     }
 
     updatePositions(movement, deltaTime) {
-        this.obstacles.forEach(o => { o.position.z += movement; });
-        this.collectibles.forEach(c => {
+        for (const o of this.obstacles) o.position.z += movement;
+        for (const c of this.collectibles) {
             c.position.z += movement;
             c.rotation.y += 3.0 * deltaTime;
-        });
-        this.decorations.forEach(d => { d.position.z += movement; });
+        }
+        for (const d of this.decorations) d.position.z += movement;
     }
 
-    updateSpawning(deltaTime, bunnyZ, getObstacleInterval, getCollectibleInterval) {
-        this.obstacleSpawnTimer += deltaTime * 1000;
-        if (this.obstacleSpawnTimer >= this.nextObstacleSpawnTime) {
-            const spawnZ = bunnyZ - this.obstacleSpawnDistance;
-            this.createObstacle(spawnZ);
-            this.obstacleSpawnTimer = 0;
-            this.nextObstacleSpawnTime = getObstacleInterval();
+    // `difficulty` is the active entry of the game's difficulty config (it holds the spawn intervals)
+    updateSpawning(deltaTime, bunnyZ, difficulty) {
+        const ms = deltaTime * 1000;
+
+        this.obstacleTimer += ms;
+        if (this.obstacleTimer >= this.nextObstacleIn) {
+            this.createObstacle(bunnyZ - this.obstacleSpawnDistance);
+            this.obstacleTimer = 0;
+            this.nextObstacleIn = randomIn(difficulty.obstacleIntervalRange);
         }
 
-        this.collectibleSpawnTimer += deltaTime * 1000;
-        if (this.collectibleSpawnTimer >= this.nextCollectibleSpawnTime) {
+        this.collectibleTimer += ms;
+        if (this.collectibleTimer >= this.nextCollectibleIn) {
             if (this.collectibles.length < this.maxCollectibles) {
-                const spawnZ = bunnyZ - this.collectibleSpawnDistance;
-                this.createContinuousCollectible(spawnZ);
+                this.createCollectible(bunnyZ - this.collectibleSpawnDistance);
             }
-            this.collectibleSpawnTimer = 0;
-            this.nextCollectibleSpawnTime = getCollectibleInterval();
+            this.collectibleTimer = 0;
+            this.nextCollectibleIn = randomIn(difficulty.collectibleIntervalRange);
         }
 
-        this.cleanupOldObjects(bunnyZ);
+        this.removePassed(bunnyZ);
     }
 
-    cleanupOldObjects(bunnyZ) {
-        const threshold = bunnyZ + Math.abs(this.obstacleRemovalDistance);
+    // Drops everything that scrolled past `limit` from the scene and returns the rest
+    sweep(list, limit) {
+        return list.filter(obj => {
+            if (obj.position.z <= limit) return true;
+            this.scene.remove(obj);
+            return false;
+        });
+    }
 
-        for (let i = this.obstacles.length - 1; i >= 0; i--) {
-            const o = this.obstacles[i];
-            if (o.position.z > threshold) {
-                ProceduralModels.disposeHierarchy(o);
-                this.scene.remove(o);
-                this.obstacles.splice(i, 1);
-            }
-        }
-
-        for (let i = this.collectibles.length - 1; i >= 0; i--) {
-            const c = this.collectibles[i];
-            if (c.position.z > threshold) {
-                ProceduralModels.disposeHierarchy(c);
-                this.scene.remove(c);
-                this.collectibles.splice(i, 1);
-            }
-        }
-
-        const decThreshold = bunnyZ + 20;
-        for (let i = this.decorations.length - 1; i >= 0; i--) {
-            const d = this.decorations[i];
-            if (d.position.z > decThreshold) {
-                ProceduralModels.disposeHierarchy(d);
-                this.scene.remove(d);
-                this.decorations.splice(i, 1);
-            }
-        }
+    removePassed(bunnyZ) {
+        const limit = bunnyZ + this.removalDistance;
+        this.obstacles = this.sweep(this.obstacles, limit);
+        this.collectibles = this.sweep(this.collectibles, limit);
+        this.decorations = this.sweep(this.decorations, bunnyZ + 20);
     }
 
     clear() {
-        this.obstacles.forEach(o => {
-            ProceduralModels.disposeHierarchy(o);
-            this.scene.remove(o);
-        });
+        [...this.obstacles, ...this.collectibles, ...this.decorations].forEach(obj => this.scene.remove(obj));
         this.obstacles = [];
-
-        this.collectibles.forEach(c => {
-            ProceduralModels.disposeHierarchy(c);
-            this.scene.remove(c);
-        });
         this.collectibles = [];
-
-        this.decorations.forEach(d => {
-            ProceduralModels.disposeHierarchy(d);
-            this.scene.remove(d);
-        });
         this.decorations = [];
+        this.resetSpawnTimers();
     }
 }

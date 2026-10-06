@@ -1,279 +1,102 @@
-// AudioSynth.js - Web Audio API Procedural Synthesizer & Sound FX Subsystem
+// AudioSynth.js - every sound is a few oscillator notes made on the fly (no audio files)
+
+// Sound effects: each one is a handful of notes. See note() for the options.
+const SFX = {
+    jump:      (a) => a.note(600, { dur: 0.2, vol: 0.3, glide: [[300, 0.1], [400, 0.2]], lowpass: 2000 }),
+    collect:   (a) => [800, 1000, 1200, 1600].forEach((hz, i) => a.note(hz, { at: i * 0.05, dur: 0.3 })),
+    gameOver:  (a) => a.note(300, { type: 'triangle', dur: 0.5, vol: 0.25, glide: [[200, 0.5]], lowpass: 800 }),
+    milestone: (a) => [400, 500, 600, 800, 1000].forEach((hz, i) => a.note(hz, { at: i * 0.1, type: 'square', dur: 0.3, vol: 0.3 })),
+    countdown: (a) => a.note(880, { dur: 0.15 })
+};
+
+// Background tune as [frequency, start time (s), duration (s)]. It lasts ~4.6s and loops every 8s.
+const MELODY = [
+    [523, 0.0, 0.3], [587, 0.4, 0.3], [659, 0.8, 0.3], [523, 1.2, 0.3], [659, 1.8, 0.3],
+    [698, 2.2, 0.6], [659, 3.0, 0.3], [587, 3.4, 0.3], [523, 3.8, 0.8]
+];
+
 export class AudioSynth {
     constructor(game) {
         this.game = game;
-        this.audioListener = null;
-        this.audioEnabled = false;
-        this.musicEnabled = true;
-        this.activeOscillators = [];
-        this.musicLoopInterval = null;
-        this.musicToggleCooldown = false;
-        this.soundEffects = {};
-    }
-
-    init(camera) {
-        this.audioListener = new THREE.AudioListener();
-        camera.add(this.audioListener);
-        this.createSoundEffects();
+        this.ctx = null;        // created on the first click (browsers block audio before a user gesture)
+        this.musicBus = null;   // all music notes go through this so they can be faded out together
+        this.musicLoop = null;
     }
 
     enableAudio() {
-        if (!this.audioEnabled) {
-            this.audioEnabled = true;
-            if (this.audioListener && this.audioListener.context.state === 'suspended') {
-                this.audioListener.context.resume();
-            }
+        try {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+        } catch {
+            this.ctx = null; // no Web Audio here: the game is just quiet
         }
     }
 
-    createSoundEffects() {
-        this.soundEffects = {
-            jump: () => this.playBoingSound(),
-            collect: () => this.playChimeSound(),
-            gameOver: () => this.playAwwSound(),
-            milestone: () => this.playCelebrationSound()
-        };
+    play(name) {
+        if (!this.ctx || !this.game.settings.sfxEnabled) return;
+        SFX[name](this);
     }
 
-    getContext() {
-        return this.audioListener ? this.audioListener.context : null;
-    }
-
-    playBoingSound() {
-        if (!this.audioEnabled || !this.game.settings?.sfxEnabled) return;
-        const ctx = this.getContext();
-        if (!ctx) return;
-
+    // One oscillator note.
+    //   at: start offset in s   dur: length in s   vol: loudness   type: waveform
+    //   glide: [[hz, time], ...] pitch slides   lowpass: filter cutoff in Hz
+    //   soft: gentle music envelope instead of a quick sfx decay   out: node to play into
+    note(freq, { at = 0, dur = 0.2, vol = 0.2, type = 'sine', glide = [], lowpass = 0, soft = false, out = null } = {}) {
+        const ctx = this.ctx;
+        const t = ctx.currentTime + at;
         const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const filter = ctx.createBiquadFilter();
+        const amp = ctx.createGain();
 
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        glide.forEach(([hz, when]) => osc.frequency.exponentialRampToValueAtTime(hz, t + when));
 
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(600, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.1);
-        osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.2);
+        if (soft) {
+            amp.gain.setValueAtTime(0, t);
+            amp.gain.linearRampToValueAtTime(vol, t + 0.05);
+            amp.gain.linearRampToValueAtTime(vol * 0.7, t + dur * 0.7);
+            amp.gain.linearRampToValueAtTime(0, t + dur);
+        } else {
+            amp.gain.setValueAtTime(vol, t);
+            amp.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        }
 
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2000, ctx.currentTime);
+        let source = osc;
+        if (lowpass) {
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = lowpass;
+            osc.connect(filter);
+            source = filter;
+        }
+        source.connect(amp);
+        amp.connect(out || ctx.destination);
 
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.2);
-    }
-
-    playChimeSound() {
-        if (!this.audioEnabled || !this.game.settings?.sfxEnabled) return;
-        const ctx = this.getContext();
-        if (!ctx) return;
-
-        const frequencies = [800, 1000, 1200, 1600];
-        frequencies.forEach((freq, idx) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-
-            osc.type = 'sine';
-            const startTime = ctx.currentTime + idx * 0.05;
-            osc.frequency.setValueAtTime(freq, startTime);
-
-            gain.gain.setValueAtTime(0, startTime);
-            gain.gain.exponentialRampToValueAtTime(0.2, startTime + 0.01);
-            gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
-
-            osc.start(startTime);
-            osc.stop(startTime + 0.3);
-        });
-    }
-
-    playAwwSound() {
-        if (!this.audioEnabled || !this.game.settings?.sfxEnabled) return;
-        const ctx = this.getContext();
-        if (!ctx) return;
-
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const filter = ctx.createBiquadFilter();
-
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(300, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.5);
-
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(800, ctx.currentTime);
-
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.5);
-    }
-
-    playCelebrationSound() {
-        if (!this.audioEnabled || !this.game.settings?.sfxEnabled) return;
-        const ctx = this.getContext();
-        if (!ctx) return;
-
-        const frequencies = [400, 500, 600, 800, 1000];
-        frequencies.forEach((freq, idx) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-
-            osc.type = 'square';
-            const startTime = ctx.currentTime + idx * 0.1;
-            osc.frequency.setValueAtTime(freq, startTime);
-
-            gain.gain.setValueAtTime(0.3, startTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
-
-            osc.start(startTime);
-            osc.stop(startTime + 0.3);
-        });
-    }
-
-    playCountdownSound() {
-        if (!this.audioEnabled || !this.game.settings?.sfxEnabled) return;
-        const ctx = this.getContext();
-        if (!ctx) return;
-
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.15);
+        osc.start(t);
+        osc.stop(t + dur);
     }
 
     startBackgroundMusic() {
-        if (!this.audioEnabled || !this.musicEnabled) return;
+        if (!this.ctx || !this.game.settings.musicEnabled) return;
         this.stopBackgroundMusic();
-        this.playBackgroundMelody();
-
-        this.musicLoopInterval = setInterval(() => {
-            if (this.musicEnabled && this.audioEnabled) {
-                this.playBackgroundMelody();
-            }
-        }, 8000);
+        this.musicBus = this.ctx.createGain();
+        this.musicBus.connect(this.ctx.destination);
+        this.playMelody();
+        this.musicLoop = setInterval(() => this.playMelody(), 8000);
     }
 
-    playBackgroundMelody() {
-        if (!this.audioEnabled || !this.musicEnabled) return;
-        const ctx = this.getContext();
-        if (!ctx) return;
-
-        const melody = [
-            { note: 523, time: 0.0, duration: 0.3 },
-            { note: 587, time: 0.4, duration: 0.3 },
-            { note: 659, time: 0.8, duration: 0.3 },
-            { note: 523, time: 1.2, duration: 0.3 },
-            { note: 659, time: 1.8, duration: 0.3 },
-            { note: 698, time: 2.2, duration: 0.6 },
-            { note: 659, time: 3.0, duration: 0.3 },
-            { note: 587, time: 3.4, duration: 0.3 },
-            { note: 523, time: 3.8, duration: 0.8 },
-        ];
-
-        melody.forEach(({ note, time, duration }) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(note, ctx.currentTime + time);
-
-            const volume = this.game.gameState === 'gameOver' ? 0.1 : 0.2;
-            gain.gain.setValueAtTime(0, ctx.currentTime + time);
-            gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + time + 0.05);
-            gain.gain.linearRampToValueAtTime(volume * 0.7, ctx.currentTime + time + duration * 0.7);
-            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + time + duration);
-
-            const startTime = ctx.currentTime + time;
-            const endTime = startTime + duration;
-
-            osc.start(startTime);
-            osc.stop(endTime);
-
-            this.activeOscillators.push({ oscillator: osc, gainNode: gain, endTime });
-
-            osc.onended = () => {
-                this.activeOscillators = this.activeOscillators.filter(item => item.oscillator !== osc);
-                try {
-                    osc.disconnect();
-                    gain.disconnect();
-                } catch (e) {}
-            };
-        });
+    playMelody() {
+        MELODY.forEach(([hz, at, dur]) => this.note(hz, { at, dur, soft: true, out: this.musicBus }));
     }
 
     stopBackgroundMusic() {
-        if (this.musicLoopInterval) {
-            clearInterval(this.musicLoopInterval);
-            this.musicLoopInterval = null;
-        }
+        clearInterval(this.musicLoop);
+        this.musicLoop = null;
+        if (!this.musicBus) return;
 
-        if (this.activeOscillators && this.activeOscillators.length > 0) {
-            const now = this.getContext()?.currentTime || 0;
-            this.activeOscillators.forEach(({ oscillator, gainNode }) => {
-                try {
-                    gainNode.gain.cancelScheduledValues(now);
-                    gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-                    gainNode.gain.linearRampToValueAtTime(0, now + 0.05);
-                    oscillator.stop(now + 0.05);
-                } catch (e) {}
-            });
-            this.activeOscillators = [];
-        }
-    }
-
-    toggleMusic() {
-        if (this.musicToggleCooldown) return;
-        this.musicToggleCooldown = true;
-        setTimeout(() => { this.musicToggleCooldown = false; }, 300);
-
-        this.musicEnabled = !this.musicEnabled;
-        if (this.game.settings) {
-            this.game.settings.musicEnabled = this.musicEnabled;
-            this.game.saveSettings();
-        }
-
-        const musicToggleSetting = document.getElementById('music-setting');
-        if (musicToggleSetting) musicToggleSetting.checked = this.musicEnabled;
-
-        const musicBtn = document.getElementById('music-toggle');
-        if (musicBtn) {
-            if (this.musicEnabled) {
-                musicBtn.innerHTML = '<span style="font-size: 1.2rem; font-weight: bold;">♫</span>';
-                musicBtn.title = 'Mute Music';
-                if (this.audioEnabled && this.game.gameState === 'playing') {
-                    this.startBackgroundMusic();
-                }
-            } else {
-                musicBtn.innerHTML = '<span style="font-size: 1.2rem; font-weight: bold;">♪</span>';
-                musicBtn.title = 'Unmute Music';
-                this.stopBackgroundMusic();
-            }
-        }
+        const bus = this.musicBus;
+        this.musicBus = null;
+        bus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02); // quick fade, then unplug whatever is still scheduled
+        setTimeout(() => bus.disconnect(), 300);
     }
 }

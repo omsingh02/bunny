@@ -1,7 +1,35 @@
-// UIController.js - DOM Screens, Transitions, Dialogs & HUD Subsystem
+// UIController.js - screens, HUD and every button/toggle in the DOM
+import { $ } from './dom.js';
+import { StorageManager } from './StorageManager.js';
+
+const on = (id, event, handler) => $(id).addEventListener(event, handler);
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// settings-screen checkbox id -> key in game.settings
+export const SETTING_TOGGLES = {
+    'music-setting': 'musicEnabled',
+    'sfx-setting': 'sfxEnabled',
+    'haptic-setting': 'hapticEnabled',
+    'particles-setting': 'particlesEnabled',
+    'keyboard-hints-setting': 'keyboardHintsEnabled'
+};
+
+const RANK_CLASSES = ['gold', 'silver', 'bronze'];
+
+const GAME_OVER_MESSAGES = [
+    'What a cute run, bestie! 💕',
+    'Cutest run ever! 🐰',
+    'Best BFF! 🌸',
+    'So proud of you! 💖',
+    'Keep hopping! ✨'
+];
+
 export class UIController {
     constructor(game) {
         this.game = game;
+        this.shownCombo = 0;          // combo currently on screen (so the pulse only replays when it grows)
+        this.toastTimer = null;
+        this.settingsReturnTo = 'main-menu'; // where "SAVE & CLOSE" goes back to
     }
 
     init() {
@@ -9,383 +37,222 @@ export class UIController {
         this.setupDifficultySelector();
         this.setupSettingsScreen();
         this.setupLeaderboardScreen();
-        this.setupTutorialScreen();
-        this.setupErrorHandling();
     }
+
+    // ---- screens -------------------------------------------------------------------------
 
     showScreen(screenId) {
-        document.querySelectorAll(".screen").forEach(screen => {
-            screen.classList.add("hidden");
-        });
-
-        const target = document.getElementById(screenId);
-        if (target) {
-            target.classList.remove("hidden");
-        }
-
-        const touchControls = document.getElementById("touch-controls");
-        if (touchControls) {
-            if (this.game.isTouchDevice && screenId === "game-hud") {
-                touchControls.classList.remove("hidden");
-            } else {
-                touchControls.classList.add("hidden");
-            }
-        }
+        document.querySelectorAll('.screen').forEach(screen => screen.classList.add('hidden'));
+        $(screenId).classList.remove('hidden');
+        $('touch-controls').classList.toggle('hidden', !(this.game.isTouchDevice && screenId === 'game-hud'));
+        this.game.renderPending = true; // the 3D scene is only redrawn on idle screens when something changed
     }
 
-    updateScore(score, bestScore, comboCount = 0) {
-        const cur = document.getElementById("current-score");
-        if (cur) cur.textContent = score;
+    showMainMenu(bestScore) {
+        $('best-score-menu').textContent = bestScore;
+        this.showScreen('main-menu');
+    }
 
-        const best = document.getElementById("best-score");
-        if (best) best.textContent = bestScore;
+    showGameOver(score, bestScore, isNewBest) {
+        $('final-score').textContent = score;
+        $('best-score-final').textContent = bestScore;
+        $('game-over-title').textContent = isNewBest ? 'New Best Score! 🏆' : "You're Awesome!";
+        $('game-over-message').textContent = isNewBest
+            ? 'Amazing work, bestie! 💖'
+            : GAME_OVER_MESSAGES[Math.floor(Math.random() * GAME_OVER_MESSAGES.length)];
+        $('celebration').style.display = isNewBest ? 'block' : 'none'; // confetti only for a new best
+        this.showScreen('game-over');
+    }
 
-        const comboDisplay = document.getElementById("combo-display");
-        const comboCountEl = document.getElementById("combo-count");
+    showError(title, message, error) {
+        $('error-title').textContent = title;
+        $('error-message').textContent = message;
+        $('error-details').textContent = error?.stack || '';
+        this.showScreen('error-screen');
+    }
 
-        if (comboDisplay && comboCountEl) {
-            if (comboCount > 1) {
-                comboDisplay.style.display = "block";
-                comboCountEl.textContent = comboCount + "x";
-                comboDisplay.style.animation = "none";
-                setTimeout(() => {
-                    comboDisplay.style.animation = "comboPulse 0.3s ease-out";
-                }, 10);
-            } else {
-                comboDisplay.style.display = "none";
+    // ---- HUD -----------------------------------------------------------------------------
+
+    updateScore(score, bestScore, combo) {
+        $('current-score').textContent = score;
+        $('best-score').textContent = bestScore;
+
+        const box = $('combo-display');
+        if (combo > 1) {
+            $('combo-count').textContent = combo + 'x';
+            box.style.display = 'block';
+            if (combo !== this.shownCombo) {
+                box.style.animation = 'none';
+                void box.offsetWidth;        // force a reflow so the stylesheet animation starts over
+                box.style.animation = '';
             }
+        } else {
+            box.style.display = 'none';
         }
+        this.shownCombo = combo;
     }
 
     updateMilestoneProgress(score, lastMilestone, nextMilestone) {
-        const progress = Math.min(100, Math.max(0, ((score - lastMilestone) / (nextMilestone - lastMilestone)) * 100));
-        const fill = document.getElementById("milestone-fill");
-        const nextEl = document.getElementById("next-milestone");
-
-        if (fill) fill.style.width = progress + "%";
-        if (nextEl) nextEl.textContent = nextMilestone;
+        const progress = ((score - lastMilestone) / (nextMilestone - lastMilestone)) * 100;
+        $('milestone-fill').style.width = Math.min(100, Math.max(0, progress)) + '%';
+        $('next-milestone').textContent = nextMilestone;
     }
 
-    showComboFeedback(combo, score) {
-        const feedback = document.createElement("div");
-        feedback.className = "combo-feedback";
-        feedback.innerHTML = "+" + score + " " + combo + "x COMBO! ✨";
-        feedback.style.left = "50%";
-        feedback.style.top = "40%";
-        document.getElementById("game-container")?.appendChild(feedback);
+    showComboFeedback(combo, points) {
+        const feedback = document.createElement('div');
+        feedback.className = 'combo-feedback';
+        feedback.textContent = `+${points} ${combo}x COMBO! ✨`;
+        $('game-container').appendChild(feedback);
         setTimeout(() => feedback.remove(), 1000);
     }
 
-    showSpeedUpFeedback() {
-        const speedText = document.createElement("div");
-        speedText.className = "speed-indicator";
-        speedText.textContent = "SPEED UP! ⚡";
-        speedText.style.position = "absolute";
-        speedText.style.top = "30%";
-        speedText.style.left = "50%";
-        speedText.style.transform = "translate(-50%, -50%)";
-        speedText.style.color = "#FFD700";
-        speedText.style.fontSize = "2rem";
-        speedText.style.fontWeight = "bold";
-        speedText.style.textShadow = "0 0 10px rgba(255, 215, 0, 0.5)";
-        speedText.style.zIndex = "1000";
-        speedText.style.animation = "speedPulse 0.5s ease-out";
-
-        document.getElementById("game-container")?.appendChild(speedText);
-        setTimeout(() => speedText.remove(), 500);
-    }
-
     showAchievementToast(title, desc) {
-        const toast = document.getElementById("achievement-toast");
-        const titleEl = document.getElementById("achievement-title");
-        const descEl = document.getElementById("achievement-desc");
+        $('achievement-title').textContent = title;
+        $('achievement-desc').textContent = desc;
+        const toast = $('achievement-toast');
+        toast.classList.add('show');
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+    }
 
-        if (toast && titleEl && descEl) {
-            titleEl.textContent = title;
-            descEl.textContent = desc;
-            toast.classList.add("show");
-            setTimeout(() => { toast.classList.remove("show"); }, 3000);
+    updatePauseMenuStats(score, maxCombo) {
+        $('pause-score').textContent = score;
+        $('pause-combo').textContent = maxCombo + 'x';
+    }
+
+    // 3... 2... 1... GO! (resolves when the run should start)
+    async startCountdown() {
+        const countdown = $('countdown-screen');
+        const number = $('countdown-number');
+        const { audio, input } = this.game;
+
+        countdown.classList.remove('hidden');
+        $('touch-controls').classList.add('hidden');
+
+        for (const label of ['3', '2', '1', 'GO!']) {
+            const go = label === 'GO!';
+            number.textContent = label;
+            number.style.animation = 'none';
+            void number.offsetWidth;         // replay the pop-in animation for every number
+            number.style.animation = '';
+
+            audio.play(go ? 'milestone' : 'countdown');
+            input.triggerHapticFeedback(go ? 'medium' : 'light');
+            await sleep(go ? 350 : 650);
         }
+
+        countdown.classList.add('hidden');
+        if (this.game.isTouchDevice) $('touch-controls').classList.remove('hidden');
     }
 
-    updatePauseMenuStats(score, bestScore, speed) {
-        const pScore = document.getElementById("pause-current-score");
-        const pBest = document.getElementById("pause-best-score");
-        const pSpeed = document.getElementById("pause-speed");
-
-        if (pScore) pScore.textContent = score;
-        if (pBest) pBest.textContent = bestScore;
-        if (pSpeed) pSpeed.textContent = speed.toFixed(1) + "x";
-    }
-
-    startCountdown() {
-        return new Promise((resolve) => {
-            const countdownScreen = document.getElementById("countdown-screen");
-            const countdownNumber = document.getElementById("countdown-number");
-
-            if (!countdownScreen || !countdownNumber) {
-                resolve();
-                return;
-            }
-
-            countdownScreen.classList.remove("hidden");
-
-            const touchControls = document.getElementById("touch-controls");
-            if (touchControls) touchControls.classList.add("hidden");
-
-            let count = 3;
-            const interval = setInterval(() => {
-                countdownNumber.textContent = count;
-
-                if (this.game.settings?.sfxEnabled) {
-                    this.game.audio?.playCountdownSound();
-                }
-                if (this.game.settings?.hapticEnabled) {
-                    this.game.input?.triggerHapticFeedback("light");
-                }
-
-                count--;
-
-                if (count < 0) {
-                    clearInterval(interval);
-                    countdownNumber.textContent = "GO!";
-
-                    if (this.game.settings?.sfxEnabled) {
-                        this.game.audio?.soundEffects?.milestone?.();
-                    }
-                    if (this.game.settings?.hapticEnabled) {
-                        this.game.input?.triggerHapticFeedback("medium");
-                    }
-
-                    setTimeout(() => {
-                        countdownScreen.classList.add("hidden");
-                        if (touchControls && this.game.isTouchDevice) {
-                            touchControls.classList.remove("hidden");
-                        }
-                        resolve();
-                    }, 500);
-                }
-            }, 1000);
-        });
-    }
+    // ---- buttons -------------------------------------------------------------------------
 
     setupButtons() {
-        const startBtn = document.getElementById("start-btn");
-        if (startBtn) startBtn.addEventListener("click", () => {
-            this.game.enableAudio();
-            this.game.startGame();
-        });
+        const game = this.game;
 
-        const pauseBtn = document.getElementById("pause-btn");
-        if (pauseBtn) pauseBtn.addEventListener("click", () => this.game.pauseGame());
+        on('start-btn', 'click', () => game.startGame());
+        on('restart-btn', 'click', () => game.startGame());
+        on('play-again-btn', 'click', () => game.startGame());
+        on('pause-btn', 'click', () => game.pauseGame());
+        on('resume-btn', 'click', () => game.resumeGame());
+        on('menu-btn', 'click', () => game.showMainMenu());
+        on('menu-return-btn', 'click', () => game.showMainMenu());
+        on('music-toggle', 'click', () => game.setSetting('musicEnabled', !game.settings.musicEnabled));
 
-        const resumeBtn = document.getElementById("resume-btn");
-        if (resumeBtn) resumeBtn.addEventListener("click", () => this.game.resumeGame());
-
-        const restartBtn = document.getElementById("restart-btn");
-        if (restartBtn) restartBtn.addEventListener("click", () => this.game.restartGame());
-
-        const menuBtn = document.getElementById("menu-btn");
-        if (menuBtn) menuBtn.addEventListener("click", () => this.game.showMainMenu());
-
-        const playAgainBtn = document.getElementById("play-again-btn");
-        if (playAgainBtn) playAgainBtn.addEventListener("click", () => this.game.restartGame());
-
-        const menuReturnBtn = document.getElementById("menu-return-btn");
-        if (menuReturnBtn) menuReturnBtn.addEventListener("click", () => this.game.showMainMenu());
-
-        const musicToggle = document.getElementById("music-toggle");
-        if (musicToggle) musicToggle.addEventListener("click", () => this.game.toggleMusic());
-
-        const fullscreenToggle = document.getElementById("fullscreen-toggle");
-        if (fullscreenToggle) {
-            if (this.game.isMobile) fullscreenToggle.style.display = "block";
-            fullscreenToggle.addEventListener("click", () => this.game.toggleFullscreen());
+        on('fullscreen-toggle', 'click', () => game.toggleFullscreen());
+        on('fullscreen-setting-btn', 'click', () => game.toggleFullscreen());
+        if (game.isMobile) {
+            $('fullscreen-toggle').style.display = 'block';
+            $('fullscreen-setting-item').style.display = 'block';
         }
+
+        on('how-to-play-btn', 'click', () => this.showScreen('tutorial-screen'));
+        on('tutorial-close-btn', 'click', () => this.showScreen('main-menu'));
+        on('error-retry-btn', 'click', () => location.reload());
     }
 
     setupDifficultySelector() {
-        const prevBtn = document.getElementById("diff-prev-btn");
-        const nextBtn = document.getElementById("diff-next-btn");
-
-        if (prevBtn) prevBtn.addEventListener("click", () => this.game.changeDifficulty(-1));
-        if (nextBtn) nextBtn.addEventListener("click", () => this.game.changeDifficulty(1));
-
+        on('difficulty-prev', 'click', () => this.game.changeDifficulty(-1));
+        on('difficulty-next', 'click', () => this.game.changeDifficulty(1));
         this.updateDifficultyDisplay();
     }
 
     updateDifficultyDisplay() {
-        const config = this.game.difficultyConfig[this.game.selectedDifficulty];
-        const nameEl = document.getElementById("difficulty-name");
-        const descEl = document.getElementById("difficulty-desc");
-
-        if (nameEl) nameEl.textContent = config.icon + " " + config.name;
-        if (descEl) descEl.textContent = config.description;
-
-        const badge = document.querySelector(".difficulty-badge");
-        if (badge) {
-            badge.textContent = config.badge;
-            badge.className = "difficulty-badge " + config.badgeClass + " show";
-        }
+        const key = this.game.selectedDifficulty;
+        const { icon, name, description } = this.game.difficultyConfig[key];
+        $('current-difficulty-icon').textContent = icon;
+        $('current-difficulty-name').textContent = name;
+        $('current-difficulty-desc').textContent = description;
+        $('recommended-badge').classList.toggle('show', key === 'medium');
     }
+
+    // ---- settings ------------------------------------------------------------------------
 
     setupSettingsScreen() {
-        if (this.game.isMobile) {
-            const fullscreenSettingItem = document.getElementById("fullscreen-setting-item");
-            if (fullscreenSettingItem) fullscreenSettingItem.style.display = "block";
+        const open = (from) => {
+            this.settingsReturnTo = from;
+            this.showScreen('settings-screen');
+        };
+        on('settings-btn', 'click', () => open('main-menu'));
+        on('pause-settings-btn', 'click', () => open('pause-menu'));
+        on('settings-close-btn', 'click', () => this.showScreen(this.settingsReturnTo));
 
-            const fullscreenSettingBtn = document.getElementById("fullscreen-setting-btn");
-            if (fullscreenSettingBtn) {
-                fullscreenSettingBtn.addEventListener("click", () => this.game.toggleFullscreen());
+        for (const [id, key] of Object.entries(SETTING_TOGGLES)) {
+            on(id, 'change', (e) => this.game.setSetting(key, e.target.checked));
+        }
+
+        on('reset-data-btn', 'click', () => {
+            if (confirm('Are you sure you want to reset all game data? This cannot be undone!')) {
+                StorageManager.clearAll();
+                location.reload();
             }
-        }
-
-        const settingsBtn = document.getElementById("settings-btn");
-        if (settingsBtn) settingsBtn.addEventListener("click", () => this.showScreen("settings-screen"));
-
-        const settingsCloseBtn = document.getElementById("settings-close-btn");
-        if (settingsCloseBtn) settingsCloseBtn.addEventListener("click", () => this.showScreen("main-menu"));
-
-        const pauseSettingsBtn = document.getElementById("pause-settings-btn");
-        if (pauseSettingsBtn) pauseSettingsBtn.addEventListener("click", () => this.showScreen("settings-screen"));
-
-        const musicToggle = document.getElementById("music-setting");
-        if (musicToggle) {
-            musicToggle.addEventListener("change", (e) => {
-                this.game.settings.musicEnabled = e.target.checked;
-                this.game.audio.musicEnabled = e.target.checked;
-                this.game.saveSettings();
-                if (!e.target.checked) this.game.audio.stopBackgroundMusic();
-            });
-        }
-
-        const sfxToggle = document.getElementById("sfx-setting");
-        if (sfxToggle) {
-            sfxToggle.addEventListener("change", (e) => {
-                this.game.settings.sfxEnabled = e.target.checked;
-                this.game.saveSettings();
-            });
-        }
-
-        const hapticToggle = document.getElementById("haptic-setting");
-        if (hapticToggle) {
-            hapticToggle.addEventListener("change", (e) => {
-                this.game.settings.hapticEnabled = e.target.checked;
-                this.game.saveSettings();
-            });
-        }
-
-        const particlesToggle = document.getElementById("particles-setting");
-        if (particlesToggle) {
-            particlesToggle.addEventListener("change", (e) => {
-                this.game.settings.particlesEnabled = e.target.checked;
-                this.game.saveSettings();
-            });
-        }
-
-        const keyboardHintsToggle = document.getElementById("keyboard-hints-setting");
-        if (keyboardHintsToggle) {
-            keyboardHintsToggle.addEventListener("change", (e) => {
-                this.game.settings.keyboardHintsEnabled = e.target.checked;
-                this.game.saveSettings();
-                const hints = document.getElementById("keyboard-hints");
-                if (hints) hints.style.display = e.target.checked ? "flex" : "none";
-            });
-        }
-
-        const resetDataBtn = document.getElementById("reset-data-btn");
-        if (resetDataBtn) {
-            resetDataBtn.addEventListener("click", () => {
-                if (confirm("Are you sure you want to reset all game data? This cannot be undone!")) {
-                    localStorage.removeItem("bunnyRunnerBestScore");
-                    localStorage.removeItem("bunnyRunnerLeaderboard");
-                    localStorage.removeItem("bunnyRunnerAchievements");
-                    localStorage.removeItem("bunnyRunnerSettings");
-                    alert("Data reset successfully! The game will now reload.");
-                    window.location.reload();
-                }
-            });
-        }
+        });
     }
+
+    // Makes the toggles, the music button and the keyboard hints match the saved settings
+    syncSettings(settings) {
+        for (const [id, key] of Object.entries(SETTING_TOGGLES)) {
+            $(id).checked = settings[key];
+        }
+        $('keyboard-hints').style.display = settings.keyboardHintsEnabled ? 'flex' : 'none';
+
+        const music = $('music-toggle');
+        music.querySelector('span').textContent = settings.musicEnabled ? '♫' : '♪';
+        music.title = settings.musicEnabled ? 'Mute Music' : 'Unmute Music';
+    }
+
+    // ---- leaderboard ---------------------------------------------------------------------
 
     setupLeaderboardScreen() {
-        let currentFilter = "all";
+        let filter = 'all'; // 'all' or a difficulty key
 
-        const renderLeaderboard = (filter) => {
-            const list = document.getElementById("leaderboard-list");
-            if (!list) return;
+        const render = () => {
+            const board = this.game.leaderboard;
+            const entries = filter === 'all' ? board.slice(0, 10) : board.filter(e => e.difficulty === filter);
 
-            let filtered = this.game.leaderboard;
-            if (filter !== "all") {
-                const diffIndex = parseInt(filter);
-                const diffNames = ["easy", "medium", "hard"];
-                filtered = this.game.leaderboard.filter(e => e.difficulty === diffNames[diffIndex]);
-            }
-
-            if (filtered.length === 0) {
-                list.innerHTML = "<div class=\"leaderboard-empty\"><p>🌟 No scores yet!</p><p>Start playing to see your scores here!</p></div>";
-                return;
-            }
-
-            const icons = { easy: "🌸", medium: "💕", hard: "⚡" };
-            list.innerHTML = filtered.map((e, idx) => {
-                const rankClass = idx === 0 ? "gold" : idx === 1 ? "silver" : idx === 2 ? "bronze" : "";
-                return "<div class=\"leaderboard-entry\">" +
-                    "<div class=\"leaderboard-rank " + rankClass + "\">#" + (idx + 1) + "</div>" +
-                    "<div class=\"leaderboard-info\">" +
-                        "<div class=\"leaderboard-score\">" + e.score + " points</div>" +
-                        "<div class=\"leaderboard-meta\">" + (icons[e.difficulty] || "💕") + " " + e.difficulty + " • " + e.date + "</div>" +
-                    "</div>" +
-                "</div>";
-            }).join("");
+            $('leaderboard-list').innerHTML = entries.length
+                ? entries.map((e, i) => `
+                    <div class="leaderboard-entry">
+                        <div class="leaderboard-rank ${RANK_CLASSES[i] ?? ''}">#${i + 1}</div>
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-score">${Number(e.score)} points</div>
+                            <div class="leaderboard-meta">${this.game.difficultyConfig[e.difficulty]?.icon ?? '💕'} ${e.difficulty} • ${e.date}</div>
+                        </div>
+                    </div>`).join('')
+                : '<div class="leaderboard-empty"><p>🌟 No scores yet!</p><p>Start playing to see your scores here!</p></div>';
         };
 
-        document.querySelectorAll(".leaderboard-tab").forEach(tab => {
-            tab.addEventListener("click", () => {
-                document.querySelectorAll(".leaderboard-tab").forEach(t => t.classList.remove("active"));
-                tab.classList.add("active");
-                currentFilter = tab.dataset.difficulty;
-                renderLeaderboard(currentFilter);
-            });
+        const tabs = document.querySelectorAll('.leaderboard-tab');
+        tabs.forEach(tab => tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.toggle('active', t === tab));
+            filter = tab.dataset.difficulty;
+            render();
+        }));
+
+        on('leaderboard-btn', 'click', () => {
+            this.showScreen('leaderboard-screen');
+            render();
         });
-
-        const lbBtn = document.getElementById("leaderboard-btn");
-        if (lbBtn) lbBtn.addEventListener("click", () => {
-            this.showScreen("leaderboard-screen");
-            renderLeaderboard(currentFilter);
-        });
-
-        const lbClose = document.getElementById("leaderboard-close-btn");
-        if (lbClose) lbClose.addEventListener("click", () => this.showScreen("main-menu"));
-    }
-
-    setupTutorialScreen() {
-        const howToPlayBtn = document.getElementById("how-to-play-btn");
-        if (howToPlayBtn) howToPlayBtn.addEventListener("click", () => this.showScreen("tutorial-screen"));
-
-        const tutorialCloseBtn = document.getElementById("tutorial-close-btn");
-        if (tutorialCloseBtn) tutorialCloseBtn.addEventListener("click", () => this.showScreen("main-menu"));
-    }
-
-    setupErrorHandling() {
-        const retryBtn = document.getElementById("error-retry-btn");
-        if (retryBtn) retryBtn.addEventListener("click", () => window.location.reload());
-
-        const supportBtn = document.getElementById("error-support-btn");
-        if (supportBtn) supportBtn.addEventListener("click", () => {
-            window.open("https://github.com/omsingh02/bunny/issues", "_blank");
-        });
-    }
-
-    showError(title, message) {
-        const screen = document.getElementById("error-screen");
-        const titleEl = document.getElementById("error-title");
-        const descEl = document.getElementById("error-description");
-
-        if (screen) {
-            if (titleEl) titleEl.textContent = title;
-            if (descEl) descEl.textContent = message;
-            screen.classList.remove("hidden");
-        }
+        on('leaderboard-close-btn', 'click', () => this.showScreen('main-menu'));
     }
 }

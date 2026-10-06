@@ -2,10 +2,19 @@
   "name": "bunny-runner",
   "version": "1.0.0",
   "description": "Bunny Runner - Cute Endless Adventure 3D Game",
+  "type": "module",
+  "homepage": "https://bunny.omsingh.me",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omsingh02/bunny.git"
+  },
+  "bugs": {
+    "url": "https://github.com/omsingh02/bunny/issues"
+  },
   "scripts": {
-    "dev": "python3 -m http.server 8080",
     "start": "python3 -m http.server 8080",
-    "test": "node tests/run-all.mjs"
+    "test": "node tests/wiring.mjs && node tests/smoke.mjs",
+    "assets": "node scripts/make-assets.mjs"
   },
   "keywords": [
     "threejs",

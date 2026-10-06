@@ -5,20 +5,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Bunny Runner - Cute Endless Adventure! 🐰✨</title>
     <meta name="description" content="The cutest endless runner game ever! Help bunny hop through obstacles and collect gems! 🐰✨">
+    <link rel="canonical" href="https://bunny.omsingh.me/">
+
+    <!-- Icons -->
+    <link rel="icon" href="favicon.ico" sizes="48x48">
+    <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+
+    <!-- Installing it / adding it to the home screen -->
+    <link rel="manifest" href="assets/manifest.json">
+    <meta name="application-name" content="Bunny Runner">
+    <meta name="apple-mobile-web-app-title" content="Bunny Runner">
     <meta name="theme-color" content="#DDA0DD">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
-    <link rel="manifest" href="assets/manifest.json">
+
+    <!-- Link previews (Open Graph + Twitter) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Bunny Runner">
+    <meta property="og:title" content="Bunny Runner - Cute Endless Adventure! 🐰✨">
+    <meta property="og:description" content="The cutest endless runner game ever! Help bunny hop through obstacles and collect gems! 🐰✨">
+    <meta property="og:url" content="https://bunny.omsingh.me/">
+    <meta property="og:image" content="https://bunny.omsingh.me/preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="A pink bunny hopping down a pastel meadow past hearts and flowers, with a 3x combo badge">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Bunny Runner - Cute Endless Adventure! 🐰✨">
+    <meta name="twitter:description" content="The cutest endless runner game ever! Help bunny hop through obstacles and collect gems! 🐰✨">
+    <meta name="twitter:image" content="https://bunny.omsingh.me/preview.png">
+    <meta name="twitter:image:alt" content="A pink bunny hopping down a pastel meadow past hearts and flowers, with a 3x combo badge">
+
+    <!-- Speed: start talking to the Three.js CDN early, and fetch the font before the CSS asks for it -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preload" href="assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="assets/styles/game.css">
     
-    <!-- Analytics: Umami (privacy-respecting, self-hosted, domain-isolated) -->
-    <script defer src="https://a.omsingh.me/script.js" 
+    <!-- Analytics: Umami (privacy-respecting, self-hosted, domain-isolated).
+         async, so a slow analytics server can never hold up the game. -->
+    <script async src="https://a.omsingh.me/script.js" 
             data-website-id="963b69b0-0203-41a7-9c6d-b9820da37c47"
             data-domains="bunny.omsingh.me"></script>
 </head>
 <body>
+    <noscript>
+        <p style="position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;margin:0;padding:2rem;text-align:center;font:600 1.25rem system-ui,sans-serif;color:#c2185b;background:#fff0f6;">
+            🐰 Bunny Runner needs JavaScript to hop! Please turn it on and refresh.
+        </p>
+    </noscript>
     <!-- Game Container -->
     <div id="game-container">
         <!-- Three.js Canvas -->
@@ -43,7 +78,7 @@
                             <div class="difficulty-display">
                                 <div class="difficulty-icon" id="current-difficulty-icon">💕</div>
                                 <div class="difficulty-info">
-                                    <div class="difficulty-name" id="current-difficulty-name">Happy Run</div>
+                                    <div class="difficulty-name" id="current-difficulty-name">Bunny Hop Fun</div>
                                     <div class="difficulty-desc" id="current-difficulty-desc">Balanced fun &amp; challenge!</div>
                                 </div>
                             </div>
@@ -184,9 +219,9 @@
                     <div class="leaderboard-content">
                         <div class="leaderboard-tabs">
                             <button class="leaderboard-tab active" data-difficulty="all">All</button>
-                            <button class="leaderboard-tab" data-difficulty="0">Easy</button>
-                            <button class="leaderboard-tab" data-difficulty="1">Normal</button>
-                            <button class="leaderboard-tab" data-difficulty="2">Hard</button>
+                            <button class="leaderboard-tab" data-difficulty="easy">Easy</button>
+                            <button class="leaderboard-tab" data-difficulty="medium">Medium</button>
+                            <button class="leaderboard-tab" data-difficulty="hard">Hard</button>
                         </div>
                         <div id="leaderboard-list" class="leaderboard-list">
                             <div class="leaderboard-empty">
@@ -246,7 +281,7 @@
                 </div>
                 
                 <!-- Achievement Toast -->
-                <div class="achievement-toast hidden" id="achievement-toast">
+                <div class="achievement-toast" id="achievement-toast">
                     <div class="achievement-icon">🏆</div>
                     <div class="achievement-info">
                         <div class="achievement-title" id="achievement-title">Achievement Unlocked!</div>
@@ -342,9 +377,6 @@
             </button>
         </div>
         
-        <!-- Particle Effects Container -->
-        <div id="particles-container"></div>
-        
         <!-- Loading Screen -->
         <div id="loading-screen">
             <div class="loading-content">
@@ -365,21 +397,13 @@
                 <div class="error-details" id="error-details"></div>
                 <div class="button-group">
                     <button id="error-retry-btn" class="btn btn--primary">TRY AGAIN</button>
-                    <button id="error-reload-btn" class="btn btn--secondary">RELOAD PAGE</button>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Audio is now handled by Three.js Audio system -->
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- deferred scripts run in order, after the page is parsed: Three.js first, then the game -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script type="module" src="assets/scripts/game.js"></script>
-    <script>
-        // Register service worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('assets/scripts/sw.js');
-        }
-    </script>
 </body>
 </html>

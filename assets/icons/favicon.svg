@@ -1,3 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <text y="80" font-size="80">🐰</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF7BB8"/><stop offset="1" stop-color="#B993FF"/></linearGradient></defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <g transform="translate(0 0) scale(1)">
+  <ellipse cx="190" cy="152" rx="44" ry="112" fill="#fff" transform="rotate(-11 190 152)"/>
+  <ellipse cx="190" cy="158" rx="22" ry="84" fill="#FFB3D1" transform="rotate(-11 190 152)"/>
+  <ellipse cx="322" cy="152" rx="44" ry="112" fill="#fff" transform="rotate(11 322 152)"/>
+  <ellipse cx="322" cy="158" rx="22" ry="84" fill="#FFB3D1" transform="rotate(11 322 152)"/>
+  <ellipse cx="256" cy="322" rx="150" ry="134" fill="#fff"/>
+  <circle cx="166" cy="352" r="27" fill="#FFB3D1" opacity=".85"/>
+  <circle cx="346" cy="352" r="27" fill="#FFB3D1" opacity=".85"/>
+  <circle cx="204" cy="306" r="20" fill="#3A2347"/>
+  <circle cx="197" cy="298" r="7" fill="#fff"/>
+  <circle cx="308" cy="306" r="20" fill="#3A2347"/>
+  <circle cx="301" cy="298" r="7" fill="#fff"/>
+  <path d="M238 338 q18-14 36 0 q-18 22-36 0z" fill="#FF4F9A"/>
+  <path d="M256 354 v14 M256 368 q-14 14-30 4 M256 368 q14 14 30 4" stroke="#B5487F" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
