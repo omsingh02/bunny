@@ -8,7 +8,7 @@
 
 ### [▶ Play it now: bunny.omsingh.me](https://bunny.omsingh.me)
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-ff69b4.svg)](LICENSE) [![Three.js r128](https://img.shields.io/badge/three.js-r128-b993ff.svg)](https://threejs.org) ![No build step](https://img.shields.io/badge/build%20step-none-98fb98.svg) ![Phones and desktops](https://img.shields.io/badge/works%20on-phones%20%26%20desktops-ffa6c9.svg)
+[![Tests](https://github.com/omsingh02/bunny/actions/workflows/test.yml/badge.svg)](https://github.com/omsingh02/bunny/actions/workflows/test.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-ff69b4.svg)](LICENSE) [![Three.js r128](https://img.shields.io/badge/three.js-r128-b993ff.svg)](https://threejs.org) ![No build step](https://img.shields.io/badge/build%20step-none-98fb98.svg) ![Phones and desktops](https://img.shields.io/badge/works%20on-phones%20%26%20desktops-ffa6c9.svg)
 
 <img src="assets/screenshots/demo.gif" width="720" alt="Gameplay: the bunny weaves between lanes grabbing treats while the combo climbs from 2x to 5x">
 
@@ -181,7 +181,7 @@ npm test
 - **`tests/wiring.mjs`** runs instantly with no browser. It checks that every element id the JS looks up exists in `index.html`, that every file the pages, manifest and CSS point at exists (icons at the sizes they claim), that the link-preview, canonical and sitemap URLs agree with `CNAME`, that the leaderboard logic holds, and that this README still matches the game and its links work.
 - **`tests/smoke.mjs`** plays the real game in headless Chromium: menu, difficulty picker, countdown, keyboard, combos, pause, settings, game over, leaderboard and a reload, then a phone-sized run with real touch events.
 
-The smoke test needs `chromium` on your `PATH` and internet for Three.js. Offline, point it at a local copy: `THREE_JS=/path/to/three.min.js npm test`.
+The smoke test needs Chrome or Chromium (found automatically; set `CHROME_BIN` if yours lives somewhere unusual) and internet for Three.js. Offline, point it at a local copy: `THREE_JS=/path/to/three.min.js npm test`. GitHub Actions runs `npm test` on every push and pull request.
 
 ## 📸 Icons, preview image and screenshots
 
@@ -194,7 +194,7 @@ npm run assets screenshots   # preview.png (link card) + install screenshots
 npm run assets demo          # the gameplay GIF above (about 2 minutes)
 ```
 
-The bunny icon is drawn in `scripts/make-assets.mjs`. The screenshots are real frames of the game, and the GIF is an autopilot playing it with a fixed random seed, so it comes out the same every time. It needs `chromium`, plus `ffmpeg` for the GIF. `optipng` and `gifsicle` are used if you have them.
+The bunny icon is drawn in `scripts/make-assets.mjs`. The screenshots are real frames of the game, and the GIF is an autopilot playing it with a fixed random seed, so it comes out the same every time. It needs Chrome or Chromium, plus `ffmpeg` for the GIF. `optipng` and `gifsicle` are used if you have them.
 
 ## 🌍 Deploy your own
 
@@ -228,7 +228,7 @@ The live site also sends anonymous usage stats to a self-hosted [Umami](https://
 
 ## 🤝 Contributing
 
-Bug reports, ideas and pull requests are welcome: [open an issue](https://github.com/omsingh02/bunny/issues). Please run `npm test` before sending a PR, and keep the game **simple, fast and cute** 🐰: no frameworks and no build tooling.
+Bug reports, ideas and pull requests are welcome: [open an issue](https://github.com/omsingh02/bunny/issues). The short version is in [CONTRIBUTING.md](CONTRIBUTING.md): run `npm test` before sending a PR, and keep the game **simple, fast and cute** 🐰 (no frameworks, no build tooling).
 
 ## 📄 License
 

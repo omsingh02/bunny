@@ -1,0 +1,33 @@
+name: Bug report
+description: Something looks wrong or doesn't work
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead? A screenshot helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can I make it happen?
+      placeholder: |
+        1. Pick Hard
+        2. Press START
+        3. ...
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: "e.g. iPhone 14 with Safari 17, or Windows with Chrome 126"
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors (optional)
+      description: Open the browser console (F12) and paste anything red.
+      render: shell

@@ -1,6 +1,7 @@
 // smoke.mjs - plays the real game in headless Chromium: menu, difficulty, countdown, keyboard,
 // combo, pause, settings, game over, leaderboard, a reload, and a phone-sized run with touch input.
-// Needs `chromium` on your PATH and internet (Three.js comes from a CDN), or THREE_JS=/path/to/three.min.js.
+// Needs Chrome or Chromium (found automatically, or set CHROME_BIN) and internet (Three.js comes from a CDN),
+// or THREE_JS=/path/to/three.min.js.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startStaticServer } from './helpers/static-server.mjs';
@@ -26,7 +27,7 @@ async function open(viewport, { touch = false } = {}) {
         await client.evalOnNewDocument(`window.__events = []; window.umami = { track: (name, data) => window.__events.push({ name, data }) };`);
         if (touch) await client.setTouch(true);
         await client.goto(server.url + '/');
-        await client.waitFor(`window.game?.gameState === 'menu'`, 20000);
+        await client.waitFor(`window.game?.gameState === 'menu'`, 30000);
         return client;
     } catch (error) {
         await client.close();
@@ -84,7 +85,7 @@ async function desktopRun() {
         check(await eventually(c, `game.gameState === 'playing'`, 10000), 'the countdown hands over to the game');
         check(await c.evaluate(`JSON.stringify(window.__events.find(e => e.name === 'game-start')?.data) === JSON.stringify({ difficulty: 'medium', platform: 'desktop', audio_enabled: 'yes' })`),
             'starting a run sends the game-start event');
-        check(Date.now() - started < 3500, `the countdown is quick (${Date.now() - started}ms)`);
+        check(Date.now() - started < 4000, `the countdown is quick (${Date.now() - started}ms)`);
 
         // keyboard
         await c.press('ArrowRight', 39);

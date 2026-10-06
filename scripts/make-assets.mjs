@@ -7,7 +7,7 @@
 //   npm run assets screenshots   (just preview.png + the screenshots)
 //   npm run assets demo          (the gameplay GIF for the README; needs ffmpeg, ~2 minutes)
 //
-// Needs `chromium` on your PATH (it renders the icons and plays the real game for the screenshots).
+// Needs Chrome or Chromium (found automatically, or set CHROME_BIN): it renders the icons and plays the real game.
 // Three.js comes from the CDN; no internet? THREE_JS=/path/to/three.min.js npm run assets
 // If `optipng` / `gifsicle` are installed the PNGs / the GIF are squeezed a little.
 import fs from 'node:fs';

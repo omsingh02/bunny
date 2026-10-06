@@ -1,8 +1,18 @@
 // Minimal Chrome DevTools Protocol client: starts headless Chromium and lets tests drive the page.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
+// Which browser to run: $CHROME_BIN if set, otherwise the first Chrome/Chromium found on this machine
+function findBrowser() {
+    if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+    for (const name of ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable', 'chrome']) {
+        if (spawnSync('which', [name], { stdio: 'ignore' }).status === 0) return name;
+    }
+    const macApps = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium'];
+    return macApps.find(app => fs.existsSync(app)) ?? 'chromium';
+}
 
 export class CdpClient {
     constructor({ port = 9333 } = {}) {
@@ -18,7 +28,8 @@ export class CdpClient {
     async launch(targetUrl = 'about:blank', viewport = { width: 1280, height: 720, isMobile: false }) {
         // a throwaway profile, so this never clashes with a Chromium you already have open
         this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bunny-chromium-'));
-        this.process = spawn('chromium', [
+        const browser = findBrowser();
+        this.process = spawn(browser, [
             '--headless=new',
             `--remote-debugging-port=${this.port}`,
             `--user-data-dir=${this.profileDir}`,
@@ -36,8 +47,11 @@ export class CdpClient {
         this.killBrowser = () => { try { process.kill(-this.process.pid, 'SIGKILL'); } catch {} };
         process.once('exit', this.killBrowser);
 
+        let spawnError = null;
+        this.process.once('error', (error) => { spawnError = error; }); // e.g. the browser isn't installed
+
         let tab = null;
-        for (let i = 0; i < 100 && !tab?.webSocketDebuggerUrl; i++) {
+        for (let i = 0; i < 100 && !tab?.webSocketDebuggerUrl && !spawnError; i++) {
             await new Promise(r => setTimeout(r, 100));
             try {
                 const tabs = await (await fetch(`http://127.0.0.1:${this.port}/json/list`)).json();
@@ -48,7 +62,9 @@ export class CdpClient {
         }
         if (!tab?.webSocketDebuggerUrl) {
             await this.close();
-            throw new Error(`Could not connect to Chromium on port ${this.port} (is \`chromium\` installed?)`);
+            throw new Error(spawnError
+                ? `Could not start "${browser}" (${spawnError.message}). Install Chrome or Chromium, or set CHROME_BIN to its path.`
+                : `Could not connect to "${browser}" on port ${this.port}. Is another copy using that port?`);
         }
 
         this.ws = new WebSocket(tab.webSocketDebuggerUrl);
