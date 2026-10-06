@@ -14,6 +14,7 @@ A cute hobby 3D endless runner (Three.js r128 from a CDN, vanilla ES modules, no
 - **3D objects**: obstacles, treats and scenery share pooled geometries/materials (`ProceduralModels.pools`). Never dispose them. Only per-object resources (sparkle materials) are disposed.
 - **Audio**: add sounds as a few `note()` calls in `AudioSynth.js`. Don't add audio files.
 - **Settings**: change them through `game.setSetting(key, value)` so the UI toggles, storage and music stay in sync.
+- **README**: `npm test` checks that its difficulty table, milestones, achievement titles and links match the code. Update the README when you change those.
 - Keep the emoji-friendly pastel look (🐰✨💕) and BEM-style button classes (`.btn--primary`).
 - Keep the 3 lanes at x = -2, 0, 2 and the player at z = 0; the world scrolls toward +z.
 

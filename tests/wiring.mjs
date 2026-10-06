@@ -102,6 +102,58 @@ for (const [what, value] of [['the canonical link', html.match(/rel="canonical" 
 check(read('sitemap.xml').includes(`<loc>${site}</loc>`), `sitemap.xml should list ${site}`);
 check(read('robots.txt').includes(`Sitemap: ${site}sitemap.xml`), `robots.txt should point at ${site}sitemap.xml`);
 
+// ---- LICENSE, and a README that matches the game --------------------------------------------
+check(/^MIT License/.test(read('LICENSE')), 'LICENSE should be the MIT license');
+check(JSON.parse(read('package.json')).license === 'MIT', 'package.json should say "license": "MIT"');
+
+const readme = read('README.md');
+const gameSource = read('assets/scripts/game.js');
+
+// relative links and images point at real files, and #anchors point at real headings
+// (GitHub lower-cases the heading, drops emoji and punctuation, and turns spaces into hyphens. Invisible
+// "marks" survive, which is why an emoji like 🛠️ leaves a hidden character in the anchor: this check then
+// fails, so use emoji without one in headings that you link to. Same rule as the github-slugger package.)
+const slug = (heading) => heading.toLowerCase().replace(/[^\p{L}\p{M}\p{N}\p{Pc}\s-]/gu, '').replace(/ /g, '-');
+const anchors = [...readme.matchAll(/^#{1,6} (.+)$/gm)].map(m => slug(m[1]));
+for (const m of readme.matchAll(/(?:\]\(|(?:src|href)=")([^)"\s]+)/g)) {
+    const [target, anchor] = m[1].split('#');
+    if (/^(https?:|mailto:)/.test(target)) continue;
+    if (target) check(fs.existsSync(path.join(root, target)), `README.md links to ${target}, which doesn't exist`);
+    else if (anchor) check(anchors.includes(anchor), `README.md links to #${anchor}, but no heading makes that anchor`);
+}
+
+// the project layout in the README only names things that exist
+const layout = readme.match(/\*\*Project layout\*\*\s+```\n([\s\S]*?)```/)?.[1] ?? '';
+check(layout.length > 0, 'README.md should have a **Project layout** code block');
+for (const line of layout.split('\n').filter(Boolean)) {
+    for (const entry of line.split(/ {2,}/)[0].split(', ')) {
+        check(fs.existsSync(path.join(root, entry)), `the README project layout lists ${entry}, which doesn't exist`);
+    }
+}
+
+// the difficulty table, the milestones and the achievements are copied from game.js: keep them in sync
+const seconds = ([from, to]) => `${(from / 1000).toFixed(1)}–${(to / 1000).toFixed(1)} s`;
+for (const key of ['easy', 'medium', 'hard']) {
+    const block = gameSource.match(new RegExp(`\\b${key}: \\{([^}]*)\\}`))?.[1] ?? '';
+    const number = (name) => Number(block.match(new RegExp(`${name}: ([\\d.]+)`))?.[1]);
+    const range = (name) => block.match(new RegExp(`${name}: \\[(\\d+), (\\d+)\\]`))?.slice(1).map(Number);
+    const name = block.match(/name: "([^"]+)"/)?.[1];
+    const [base, top, step] = [number('baseSpeed'), number('maxSpeed'), number('speedIncrement')];
+    const expected = [
+        name,
+        `${base} → ${top}`,
+        seconds(range('obstacleIntervalRange')),
+        seconds(range('collectibleIntervalRange')),
+        `${Math.round((top - base) / (step * 0.1))} points`
+    ];
+    for (const text of expected) check(readme.includes(text), `the ${key} row of README.md should say "${text}" (it comes from game.js)`);
+}
+const milestones = gameSource.match(/this\.milestones = \[([^\]]+)\]/)?.[1].split(',').map(n => n.trim()).join(', ');
+check(readme.includes(milestones), `README.md should list the milestones as "${milestones}"`);
+for (const [, title] of gameSource.matchAll(/title: "([^"]+)"/g)) {
+    check(readme.includes(title), `README.md should list the achievement "${title}"`);
+}
+
 // ---- leaderboard: top 10 per difficulty, best first ----------------------------------------
 let board = [];
 for (let i = 0; i < 12; i++) board = StorageManager.addToLeaderboard(board, 1000 + i * 10, 'hard');
