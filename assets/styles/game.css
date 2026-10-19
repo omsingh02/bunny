@@ -87,17 +87,12 @@ body {
     touch-action: none;
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
-    animation: cuteBackgroundShift 20s ease-in-out infinite;
 }
 
-@keyframes cuteBackgroundShift {
-    0%, 100% {
-        background: linear-gradient(135deg, #ffe4f0 0%, #e8f5ff 50%, #fff0f5 100%);
-    }
-    50% {
-        background: linear-gradient(135deg, #fff0f5 0%, #ffe4f0 50%, #e8f5ff 100%);
-    }
-}
+/* This gradient only shows if the 3D view can't (the error screen): the canvas covers the whole page and is opaque.
+   It used to shift colour forever, and floating hearts drifted over it, all hidden behind the canvas and still
+   repainted every frame (about a sixth of the menu's idle CPU in headless Chromium). Screenshots with both gone
+   are pixel for pixel the same. */
 
 h1, h2, h3 {
     font-weight: var(--font-weight-semibold);
@@ -119,43 +114,9 @@ p {
     outline-offset: 2px;
 }
 
-/* floating hearts behind everything */
-@keyframes floatingHearts {
-    0% {
-        transform: translateY(100vh) rotate(0deg);
-        opacity: 0;
-    }
-    10% {
-        opacity: 0.6;
-    }
-    90% {
-        opacity: 0.6;
-    }
-    100% {
-        transform: translateY(-100vh) rotate(360deg);
-        opacity: 0;
-    }
-}
-
-body::before,
-body::after {
-    content: '💕';
-    position: fixed;
-    font-size: 2rem;
-    pointer-events: none;
-    z-index: 0;
-    animation: floatingHearts 15s linear infinite;
-}
-
-body::before {
-    left: 10%;
-    animation-delay: 0s;
-}
-
-body::after {
-    content: '✨';
-    left: 80%;
-    animation-delay: 7s;
+/* screen titles take focus from script (UIController.showScreen), not from Tab: nothing to point at */
+[tabindex="-1"]:focus {
+    outline: none;
 }
 
 /* ---------- layers ---------- */
@@ -200,6 +161,8 @@ body::after {
     transition: all 0.3s ease;
 }
 
+/* This only hides a screen to the eye. UIController.showScreen also makes it `inert`, which is what keeps its
+   buttons out of the Tab order and away from screen readers (the moment it is hidden, not after the fade). */
 .screen.hidden {
     opacity: 0;
     pointer-events: none;
@@ -2062,5 +2025,40 @@ body::after {
 
     .difficulty-selection {
         margin: var(--space-8) 0;
+    }
+}
+
+/* ---------- reduced motion ----------
+   For people whose system asks for less motion: no idle loops, bouncing or floating, and the screens fade instead
+   of zooming. Nothing is lost: the score, the combo badge and the countdown numbers still change, they just
+   don't move while doing it. */
+@media (prefers-reduced-motion: reduce) {
+    .menu-content::before,
+    .game-title,
+    .bunny-icon,
+    .sparkles,
+    .btn-sparkle,
+    .difficulty-icon,
+    .recommended-badge,
+    .combo-item,
+    .combo-feedback,
+    .touch-jump,
+    .countdown-number,
+    .achievement-toast.show,
+    .game-over-icon,
+    .loading-bunny {
+        animation: none;
+    }
+
+    .confetti {
+        display: none;
+    }
+
+    .screen {
+        transition: opacity 0.2s ease;
+    }
+
+    .screen.hidden {
+        transform: none;
     }
 }

@@ -5,6 +5,13 @@ import { StorageManager } from './StorageManager.js';
 const on = (id, event, handler) => $(id).addEventListener(event, handler);
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// A hidden screen is only faded out by CSS (it keeps its buttons), so it is also made inert: out of the Tab order
+// and the accessibility tree at once, and its title can take focus the moment it is shown.
+const setScreenHidden = (screen, hidden) => {
+    screen.classList.toggle('hidden', hidden);
+    screen.inert = hidden;
+};
+
 // settings-screen checkbox id -> key in game.settings
 export const SETTING_TOGGLES = {
     'music-setting': 'musicEnabled',
@@ -30,9 +37,13 @@ export class UIController {
         this.shownCombo = 0;          // combo currently on screen (so the pulse only replays when it grows)
         this.toastTimer = null;
         this.settingsReturnTo = 'main-menu'; // where "SAVE & CLOSE" goes back to
+        this.usingKeyboard = false;   // the last thing the player did was press a key (so focus should follow the screens)
     }
 
     init() {
+        // capture phase, so this is known before any other handler looks at it
+        document.addEventListener('keydown', () => { this.usingKeyboard = true; }, true);
+        document.addEventListener('pointerdown', () => { this.usingKeyboard = false; }, true);
         this.setupButtons();
         this.setupDifficultySelector();
         this.setupSettingsScreen();
@@ -42,8 +53,18 @@ export class UIController {
     // ---- screens -------------------------------------------------------------------------
 
     showScreen(screenId) {
-        document.querySelectorAll('.screen').forEach(screen => screen.classList.add('hidden'));
-        $(screenId).classList.remove('hidden');
+        document.querySelectorAll('.screen').forEach(screen => setScreenHidden(screen, true));
+        setScreenHidden($(screenId), false);
+
+        // Focus must not stay on a button of the screen that just went away: Enter would press it again
+        // (it restarted the run mid-game). For keyboard players it moves to the new screen's title, which is
+        // announced and from where Tab reaches the first button; mouse and touch players see no change.
+        document.activeElement?.blur();
+        const title = this.usingKeyboard && $(screenId).querySelector('h1, h2');
+        if (title) {
+            title.tabIndex = -1;
+            title.focus({ preventScroll: true });
+        }
         $('touch-controls').classList.toggle('hidden', !(this.game.isTouchDevice && screenId === 'game-hud'));
         this.game.renderPending = true; // the 3D scene is only redrawn on idle screens when something changed
     }
@@ -126,7 +147,7 @@ export class UIController {
         const number = $('countdown-number');
         const { audio, input } = this.game;
 
-        countdown.classList.remove('hidden');
+        setScreenHidden(countdown, false);
         $('touch-controls').classList.add('hidden');
 
         for (const label of ['3', '2', '1', 'GO!']) {
@@ -141,7 +162,7 @@ export class UIController {
             await sleep(go ? 350 : 650);
         }
 
-        countdown.classList.add('hidden');
+        setScreenHidden(countdown, true);
         if (this.game.isTouchDevice) $('touch-controls').classList.remove('hidden');
     }
 
