@@ -1,12 +1,16 @@
 // wiring.mjs - instant checks, no browser needed:
 //  - every element id the JS looks up exists in index.html (and ids are unique)
 //  - every file that index.html, game.css and the JS point at exists
-//  - leaderboard and settings logic
+//  - leaderboard and settings logic, and that junk in localStorage can't get through
+//  - the README's size and budget numbers match tests/budget.mjs and the real files
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { StorageManager } from '../assets/scripts/modules/StorageManager.js';
+import { StorageManager, cleanSettings, cleanScore, cleanLeaderboard } from '../assets/scripts/modules/StorageManager.js';
 import { SETTING_TOGGLES } from '../assets/scripts/modules/UIController.js';
+import { BUDGET } from './budget.mjs';
+import { ownGzipBytes } from './helpers/size.mjs';
+import { isCompleteThree } from './helpers/three.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -23,6 +27,17 @@ const scriptFiles = fs.readdirSync(path.join(root, 'assets/scripts'), { recursiv
 const html = read('index.html');
 const htmlIds = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
 check(new Set(htmlIds).size === htmlIds.length, `duplicate ids in index.html: ${htmlIds.filter((id, i) => htmlIds.indexOf(id) !== i)}`);
+
+// ---- accessibility basics that need no browser (tests/a11y.mjs does the rest) -------------------
+const viewport = html.match(/<meta name="viewport" content="([^"]*)"/)?.[1] ?? '';
+check(viewport.length > 0, 'index.html needs a viewport meta tag');
+check(!/user-scalable\s*=\s*(no|0)|maximum-scale\s*=\s*1(\.0)?\b/.test(viewport), `the viewport tag must not lock zoom (people who need big text rely on it): "${viewport}"`);
+check(/<html lang="[a-z-]+"/i.test(html), 'the <html> tag needs a lang attribute');
+// headings go down one level at a time (h1, h2, h3), never h1 -> h3: screen readers use them as an outline
+const levels = [...html.matchAll(/<h([1-6])[\s>]/g)].map(m => Number(m[1]));
+check(levels[0] === 1 && levels.filter(l => l === 1).length === 1, 'index.html needs exactly one <h1>, and it comes first');
+levels.forEach((level, i) => check(i === 0 || level <= levels[i - 1] + 1, `heading #${i + 1} (h${level}) skips a level after h${levels[i - 1]}`));
+check(JSON.parse(read('package.json')).scripts.test.includes('tests/a11y.mjs'), '"npm test" should run tests/a11y.mjs');
 
 // ids looked up through $('id'), on('id', ...) or getElementById('id'), plus the ones the code
 // reaches through tables (settings toggles, touch buttons)
@@ -165,6 +180,62 @@ check(board.every((e, i) => i === 0 || board[i - 1].score >= e.score), 'the lead
 // ---- settings: defaults fill in anything missing -------------------------------------------
 const settings = StorageManager.loadSettings();
 check(Object.values(settings).every(v => v === true), 'settings should default to everything on');
+
+// ---- storage: whatever is saved, the game gets sane values --------------------------------------
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const defaults = cleanSettings(undefined);
+for (const junk of [null, 'abc', 42, [], [true], { musicEnabled: 'no', sfxEnabled: 0, haptic: true }]) {
+    check(same(cleanSettings(junk), defaults), `cleanSettings(${JSON.stringify(junk)}) should give the defaults`);
+}
+check(same(cleanSettings({ musicEnabled: false, bogus: 1 }), { ...defaults, musicEnabled: false }), 'cleanSettings should keep real booleans for known settings and drop everything else');
+
+for (const [junk, expected] of [['abc', 0], [-5, 0], [Infinity, 0], [NaN, 0], [null, 0], [undefined, 0], [{}, 0], [12.9, 12], ['42', 42], [0, 0]]) {
+    check(cleanScore(junk) === expected, `cleanScore(${String(junk)}) should be ${expected} (it is ${cleanScore(junk)})`);
+}
+
+const goodEntry = { score: 120, difficulty: 'hard', date: '1/2/2026', timestamp: 5 };
+check(same(cleanLeaderboard([goodEntry]), [goodEntry]), 'cleanLeaderboard should keep a well-formed entry as it is');
+check(same(cleanLeaderboard([null, 5, 'x', [], {}, { score: 'abc', difficulty: 'easy' }, { score: -1, difficulty: 'easy' }, { score: 9, difficulty: 'nope' }, goodEntry]), [goodEntry]),
+    'cleanLeaderboard should drop every malformed entry and keep the good one');
+for (const junk of [null, 'abc', 7, {}, { 0: goodEntry }]) {
+    check(same(cleanLeaderboard(junk), []), `cleanLeaderboard(${JSON.stringify(junk)}) should be an empty list`);
+}
+check(StorageManager.addToLeaderboard([null, 'x', { score: 'a' }], 50, 'easy').length === 1, 'adding a run to a leaderboard full of junk should not throw and should keep just the run');
+
+// the same through localStorage itself (Node has none, so a stand-in that returns whatever the test says)
+const savedValue = (raw) => { globalThis.localStorage = { getItem: () => raw, setItem() {}, removeItem() {} }; };
+const definitions = () => ({ a: { title: 'A' }, b: { title: 'B' } });
+for (const raw of ['null', '5', '"text"', '[]', '{oops', '{"a": null}', '{"a": {"unlocked": "yes"}}']) {
+    savedValue(raw);
+    let result = null;
+    try { result = StorageManager.loadAchievements(definitions()); } catch (e) { result = e; }
+    check(!(result instanceof Error) && result.a.unlocked === false && result.b.unlocked === false, `loading achievements from ${raw} should leave them all locked without throwing`);
+}
+savedValue('{"a": {"unlocked": true}}');
+check(StorageManager.loadAchievements(definitions()).a.unlocked === true, 'a saved unlocked achievement should stay unlocked');
+delete globalThis.localStorage;
+
+// ---- size: the README's number is the real one, and its budget table matches budget.mjs -----------
+const sizeKB = ownGzipBytes(root).total / 1000;
+check(readme.includes(`under ${Math.ceil(sizeKB)} kB gzipped`), `README.md should say the game's own files come to "under ${Math.ceil(sizeKB)} kB gzipped" (they are ${sizeKB.toFixed(1)} kB)`);
+for (const [label, value] of [
+    ['The game\'s own files, gzipped', `${BUDGET.ownGzipKB} kB`],
+    ['Draw calls in the busiest frame', String(BUDGET.peakDrawCalls)],
+    ['Triangles in the busiest frame', BUDGET.peakTriangles.toLocaleString('en-US')],
+    ['CPU time of one `update()`', `${BUDGET.updateMs} ms`],
+    ['Memory growth, minute 2 to 10', `${BUDGET.heapGrowthMB} MB`],
+    ['Geometries / objects in the scene', `${BUDGET.maxGeometries} / ${BUDGET.maxSceneObjects}`]
+]) {
+    check(readme.includes(`| ${label} | ${value} |`), `the README budget table should say "${label}: ${value}" (it comes from tests/budget.mjs)`);
+}
+
+// ---- the test helper that decides whether a downloaded Three.js is whole ---------------------
+// (a stalled CDN hands over half a file; caching that would turn every later run red)
+const wholeThree = `/* SPDX-License-Identifier: MIT */ !function(){var REVISION="128";${'x'.repeat(600_000)}}));\n`;
+check(isCompleteThree(wholeThree), 'isCompleteThree should accept a whole three.min.js');
+check(!isCompleteThree(wholeThree.slice(0, 550_000)), 'isCompleteThree should reject a download cut off partway');
+check(!isCompleteThree(''), 'isCompleteThree should reject an empty download');
+check(!isCompleteThree(wholeThree.replace('="128"', '="127"')), 'isCompleteThree should reject another Three.js revision');
 
 // ---------------------------------------------------------------------------------------------
 if (failures.length) {

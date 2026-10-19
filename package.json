@@ -14,7 +14,8 @@
   },
   "scripts": {
     "start": "python3 -m http.server 8080",
-    "test": "node tests/wiring.mjs && node tests/smoke.mjs",
+    "test": "node tests/freeze.mjs && node tests/wiring.mjs && node tests/smoke.mjs && node tests/robust.mjs && node tests/a11y.mjs && node tests/bench.mjs",
+    "bench": "node tests/bench.mjs",
     "assets": "node scripts/make-assets.mjs"
   },
   "keywords": [

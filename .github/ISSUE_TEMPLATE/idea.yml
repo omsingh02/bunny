@@ -3,6 +3,9 @@ description: Suggest something that would make the game cuter, faster or more fu
 title: "[Idea] "
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: "**Bunny Runner is complete (v1.0.0) and closed to changes.** Ideas aren't being taken on here. The game is MIT licensed, so a fork can run with yours."
   - type: textarea
     id: idea
     attributes:

@@ -8,15 +8,17 @@
 
 ### [▶ Play it now: bunny.omsingh.me](https://bunny.omsingh.me)
 
-[![Tests](https://github.com/omsingh02/bunny/actions/workflows/test.yml/badge.svg)](https://github.com/omsingh02/bunny/actions/workflows/test.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-ff69b4.svg)](LICENSE) [![Three.js r128](https://img.shields.io/badge/three.js-r128-b993ff.svg)](https://threejs.org) ![No build step](https://img.shields.io/badge/build%20step-none-98fb98.svg) ![Phones and desktops](https://img.shields.io/badge/works%20on-phones%20%26%20desktops-ffa6c9.svg)
+[![Tests](https://github.com/omsingh02/bunny/actions/workflows/test.yml/badge.svg)](https://github.com/omsingh02/bunny/actions/workflows/test.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-ff69b4.svg)](LICENSE) [![Three.js r128](https://img.shields.io/badge/three.js-r128-b993ff.svg)](https://threejs.org) ![No build step](https://img.shields.io/badge/build%20step-none-98fb98.svg) ![Status: complete](https://img.shields.io/badge/status-complete-98fb98.svg) ![Phones and desktops](https://img.shields.io/badge/works%20on-phones%20%26%20desktops-ffa6c9.svg)
 
 <img src="assets/screenshots/demo.gif" width="720" alt="Gameplay: the bunny weaves between lanes grabbing treats while the combo climbs from 2x to 5x">
 
-[How to play](#-how-to-play) · [Run it](#-run-it-yourself) · [Make it yours](#-make-it-yours) · [How it works](#-how-it-works) · [Tests](#-tests) · [Deploy](#-deploy-your-own)
+[How to play](#-how-to-play) · [Run it](#-run-it-yourself) · [Make it yours](#-make-it-yours) · [How it works](#-how-it-works) · [Accessibility](#-accessibility) · [Tests](#-tests) · [Budget](#-budget) · [Deploy](#-deploy-your-own)
 
 </div>
 
 ---
+
+> **✅ This project is complete.** Version 1.0.0 is the finished game: nothing more will be added, fixed or merged, and the repository is locked in code (`tests/freeze.mjs` fails if any file changes; see [Tests](#-tests)). It is MIT licensed, so fork it freely.
 
 ## ✨ What's inside
 
@@ -25,8 +27,9 @@
 - **Three difficulties**, each with its own speed curve and obstacle rhythm.
 - **Milestones, achievements and a leaderboard** (top 10 per difficulty). It's all saved in your browser: no accounts, no server.
 - **Made for phones too.** On-screen buttons, swipes, taps and vibration feedback. It pauses by itself when you switch apps, and you can install it to your home screen.
+- **Works without a mouse.** Every menu can be used with the keyboard alone, focus follows the screens, and the idle animations stop if your system asks for reduced motion. See [accessibility](#-accessibility).
 - **Everything is procedural.** The bunny, the flowers and the treats are built from Three.js primitives, and every sound effect and the background tune are synthesized with the Web Audio API. There are no model, texture or audio files.
-- **Tiny.** The game's own code, styles and page come to about 31 KB gzipped, plus a 40 KB font and Three.js from a CDN.
+- **Tiny.** The game's own code, styles and page come to under 34 kB gzipped, plus a 40 kB font and Three.js from a CDN. That is held to a [budget](#-budget).
 
 <p align="center">
   <img src="assets/screenshots/wide.png" height="260" alt="Desktop gameplay with the score, combo badge and milestone bar">
@@ -127,7 +130,8 @@ assets/icons/                   favicon.svg and the PNG icons (generated)
 assets/screenshots/             demo.gif and the install screenshots (generated)
 assets/manifest.json            home-screen install info
 scripts/make-assets.mjs         generates the icons, preview image and GIF
-tests/                          wiring.mjs, smoke.mjs and their helpers
+tests/                          freeze, wiring, smoke, robust, a11y and bench tests, the budget, and their helpers
+FROZEN.sha256                   the SHA-256 of every other file, checked by tests/freeze.mjs
 404.html, robots.txt, sitemap.xml, CNAME, .nojekyll    GitHub Pages and SEO basics
 favicon.ico, preview.png        generated too
 mobile/index.html               redirects old /mobile/ links to the game
@@ -168,20 +172,88 @@ stateDiagram-v2
 A few design notes:
 
 - **Frame-rate independent.** Movement, spawn timers, the jump arc and the running bounce all come from elapsed time, and a single step is capped at 50 ms so a lag spike can't teleport the bunny. It plays the same at 60, 120 or 144 Hz. The jump is a plain physics arc (`y = v·t − ½·g·t²`) and lane changes use exponential damping.
-- **Cheap to draw.** A frame is roughly 30 draw calls and 7,000 triangles. Obstacles, treats and scenery share one pool of geometries and materials, so spawning one is nearly free and nothing needs disposing.
+- **Cheap to draw.** A typical frame is about 65 draw calls and 9,500 triangles (the shadow pass included), and the busiest ones stay under the [budget](#-budget). Obstacles, treats and scenery share one pool of geometries and materials, so spawning one is nearly free and nothing needs disposing.
+- **Hard to break.** Anything read from `localStorage` is cleaned on the way in, so old or damaged saves can't stop the game. Sound, vibration and analytics can fail without interrupting a run. If WebGL or Three.js is missing you get a clear message and a Retry button that works.
 - **Forgiving on purpose.** Hitboxes are simple distance checks, a little smaller than the models.
 - **Sounds are tiny programs.** Each effect is a few oscillator notes (`AudioSynth.js`), and the music is a nine-note tune on a loop. The audio context is created on your first click, as browsers require.
+
+## 👐 Accessibility
+
+It is a visual, reflex game, so it can't be made fully playable without sight. The menus, though, should work for everyone, and that part is tested:
+
+- **Keyboard.** Tab only ever lands on what is on screen: a screen that is hidden is also `inert`, which removes it from the Tab order and from screen readers at the same moment. When a new screen opens, keyboard players land on its title and Tab leads to its first button; mouse and touch players see no change.
+- **No accidental presses.** Enter and Space during a run can't press a leftover button. (Enter used to restart the run: see [what the tests caught](#-what-the-tests-caught).)
+- **Reduced motion.** With "reduce motion" on in your system settings, the idle animations (bouncing, floating, sparkling, glowing) and the confetti stop, and screens fade instead of zooming. Scores, the combo badge and the countdown still change; they just don't move.
+- **Zoom.** The page doesn't lock zoom with its viewport tag, so browser and system text zoom work. On a phone, pinch-zoom stays off during play because the game uses the gestures.
+- **Outline.** There is one `h1` and the headings go down one level at a time.
+
+Lighthouse scores it 100 for accessibility, with the colour-contrast and touch-target checks passing (see [measured](#-measured)). Automated tools only catch part of the problems, and nobody has tested it with a screen reader on a real phone yet, so treat that as a floor and not as a certificate. The project is complete, so any gap left here (see [limitations](#-limitations)) stays; a fork can close it.
 
 ## 🧪 Tests
 
 ```bash
-npm test
+npm test         # everything below, one after the other
+npm run bench    # just the benchmark
 ```
 
-- **`tests/wiring.mjs`** runs instantly with no browser. It checks that every element id the JS looks up exists in `index.html`, that every file the pages, manifest and CSS point at exists (icons at the sizes they claim), that the link-preview, canonical and sitemap URLs agree with `CNAME`, that the leaderboard logic holds, and that this README still matches the game and its links work.
+- **`tests/freeze.mjs`** runs first and keeps the project finished. `FROZEN.sha256` holds the SHA-256 of every file, and the test fails if one changed, appeared or vanished. Reopening the project takes a deliberate commit that deletes the test (the steps are at the top of the file).
+- **`tests/wiring.mjs`** runs instantly with no browser. It checks that every element id the JS looks up exists in `index.html`, that every file the pages, manifest and CSS point at exists (icons at the sizes they claim), that the link-preview, canonical and sitemap URLs agree with `CNAME`, that the leaderboard logic holds, that junk in `localStorage` is cleaned up, and that this README still matches the game, its budget and its links.
 - **`tests/smoke.mjs`** plays the real game in headless Chromium: menu, difficulty picker, countdown, keyboard, combos, pause, settings, game over, leaderboard and a reload, then a phone-sized run with real touch events.
+- **`tests/robust.mjs`** loads the game in a hostile world and checks the player is never left stuck: junk saved in `localStorage`, a locked-down browser (no storage, sound, vibration or fullscreen), sound/vibration/analytics that throw, audio interrupted by the OS, no WebGL, Three.js failing to load, a lost WebGL context, absurd window sizes, a hidden tab during the countdown, a lag spike at top speed, and 3,000 random inputs.
+- **`tests/a11y.mjs`** uses the game with real key presses, real clicks and the system's "reduce motion" setting: Tab only ever lands on what is on screen, Enter and Space during a run never press a leftover button, focus follows each new screen for keyboard players (and doesn't move for mouse and touch players), and the idle animations stop.
+- **`tests/bench.mjs`** is the [benchmark](#-budget).
 
-The smoke test needs Chrome or Chromium (found automatically; set `CHROME_BIN` if yours lives somewhere unusual) and internet for Three.js. Offline, point it at a local copy: `THREE_JS=/path/to/three.min.js npm test`. GitHub Actions runs `npm test` on every push and pull request.
+The browser tests need Chrome or Chromium (found automatically; set `CHROME_BIN` if yours lives somewhere unusual). They download Three.js once into your temp folder and answer the game's CDN request from that copy, so a slow CDN can't fail a run (a download only counts if it arrived complete). Offline, point them at your own copy: `THREE_JS=/path/to/three.min.js npm test`. GitHub Actions runs `npm test` on every push and pull request.
+
+## 🐛 What the tests caught
+
+Each of these was a real bug. Each one now has a test that fails on the old code and passes on the new (the last one is the exception: see below the table).
+
+| Bug | Found by |
+|---|---|
+| A saved list of achievements that was just `null` froze the game on the loading screen | `robust.mjs` |
+| A `null` entry in a saved leaderboard broke the game over screen | `robust.mjs` |
+| If setup failed, the Retry button wasn't wired up yet, so the error screen couldn't be left | `robust.mjs` |
+| Pressing **Enter during a run restarted it**: focus stayed on the hidden START button | `a11y.mjs` |
+| 24 buttons on hidden screens were still in the Tab order, invisible but reachable | `a11y.mjs` |
+| After the first fix, a screen that had just faded out stayed focusable for 0.3 s (a CSS `visibility` transition reads as hidden at its first instant, so focusing the new screen silently failed too). The `inert` attribute fixed both | `a11y.mjs` |
+| A shifting page background and two floating hearts ran forever *behind the opaque 3D canvas*: nobody could see them, but they were repainted every frame. Removing them left screenshots identical, pixel for pixel, and cut the menu's idle CPU by about a sixth | a screenshot comparison |
+
+The screenshot comparison was done by hand and isn't part of `npm test`: it took seeded runs of the menu and of mid-run frames, on a desktop and a phone viewport, with animations frozen, and compared the PNGs byte for byte before and after each change. It's how the accessibility work could be shown not to alter the look. (Screenshots depend on the browser version and the GPU, so a stored set would fail for the wrong reasons on other machines.)
+
+## 📏 Budget
+
+Small and light is a feature, so it has numbers. They live in [`tests/budget.mjs`](tests/budget.mjs), `npm run bench` measures them, and `npm test` fails if any is exceeded:
+
+| What | Budget |
+|---|---|
+| The game's own files, gzipped | 35 kB |
+| Draw calls in the busiest frame | 140 |
+| Triangles in the busiest frame | 18,000 |
+| CPU time of one `update()` | 0.2 ms |
+| Memory growth, minute 2 to 10 | 1 MB |
+| Geometries / objects in the scene | 30 / 60 |
+
+- **Size** is what a visitor downloads for the game itself: `index.html`, the stylesheet and every script, each gzipped on its own, like a static host sends them. Three.js and the font aren't counted.
+- **Draw calls and triangles** are counted by Three.js in about half an hour of seeded play (every difficulty, several seeds, plus one long run), with an autopilot that dodges obstacles. They don't depend on the machine, so they compare fairly between versions. GPU time is *not* measured.
+- **Growth** checks catch leaks: after a warm-up, nothing may keep piling up in the scene, on the GPU or in memory.
+
+A budget is a ceiling, not a target: it sits a little above where the game is today, so getting bigger or heavier has to be a decision, not an accident. Raise a number only on purpose, in the pull request that needs it, and lower it when the game gets leaner.
+
+## 🔬 Measured
+
+A snapshot from 19 October 2026. Unlike the [budget](#-budget), `npm test` doesn't re-run it.
+
+| What | Result |
+|---|---|
+| Lighthouse 12.8.2, accessibility | **100** on mobile and desktop (it was 89) |
+| Lighthouse, best practices and SEO | 100 and 100 |
+| First load, over the wire | about 200 KiB for everything: the page, styles, scripts, font, Three.js from the CDN and the analytics tag |
+| A typical frame | 64 draw calls and 9,572 triangles, from `npm run bench` |
+| Lighthouse performance | 74 to 83 in three runs against a local server with gzip (75 to 77 for the code before the accessibility work: no real difference). Treat it as a rough guide: that machine draws WebGL in software (no GPU) and Lighthouse slows the CPU 4×, so a real phone will differ |
+| Menu left idle | about 0.46 s of main-thread time per 5 s in headless Chromium, against 0.08 s with every animation switched off. The animations you can see are the fun part, so they stay |
+
+To repeat the Lighthouse part: `npm start`, then `npx lighthouse http://localhost:8080 --only-categories=accessibility,best-practices,seo`.
 
 ## 📸 Icons, preview image and screenshots
 
@@ -216,7 +288,7 @@ The live site also sends anonymous usage stats to a self-hosted [Umami](https://
 
 - It needs a browser with **WebGL**, ES modules and Web Audio. The automated tests run in Chromium; current Chrome, Edge, Firefox and Safari should all work.
 - **Vibration** only works where the Vibration API exists (Android Chrome, but not iOS Safari).
-- **No offline mode.** Three.js r128 comes from cdnjs, so the first load needs internet. To self-host it, download `three.min.js` and point the `<script>` tag in `index.html` at your copy.
+- **No offline mode, and the CDN is a single point of failure.** Three.js r128 comes from cdnjs, so the first load needs internet. If the CDN is down you get the friendly error screen with Retry, but if it *stalls* (it did during testing: a download froze partway), the loading screen waits until the browser gives up, and there is no time limit or backup source yet. To self-host it, download `three.min.js` and point the `<script>` tag in `index.html` at your copy. This stays as it is: the project is complete.
 - Scores live in one browser on one device. There's no sync.
 
 ## 🙏 Credits
@@ -226,9 +298,9 @@ The live site also sends anonymous usage stats to a self-hosted [Umami](https://
 - [Umami](https://umami.is) (MIT) does the analytics.
 - The emoji are your system's own.
 
-## 🤝 Contributing
+## 🔒 Status: complete
 
-Bug reports, ideas and pull requests are welcome: [open an issue](https://github.com/omsingh02/bunny/issues). The short version is in [CONTRIBUTING.md](CONTRIBUTING.md): run `npm test` before sending a PR, and keep the game **simple, fast and cute** 🐰 (no frameworks, no build tooling). Everyone is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Bunny Runner 1.0.0 is finished, so this repository is closed to changes: no new features, fixes or pull requests, and issues aren't being handled. The reasons and the rules are in [CONTRIBUTING.md](CONTRIBUTING.md). Forks are welcome, and everyone is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## 📄 License
 

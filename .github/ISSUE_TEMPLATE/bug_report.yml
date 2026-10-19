@@ -3,6 +3,9 @@ description: Something looks wrong or doesn't work
 title: "[Bug] "
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: "**Bunny Runner is complete (v1.0.0) and closed to changes.** Bug reports aren't being handled here, so a fix isn't coming. The game is MIT licensed, so a fork can fix it."
   - type: textarea
     id: what
     attributes:
