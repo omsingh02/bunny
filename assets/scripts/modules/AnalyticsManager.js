@@ -4,7 +4,9 @@ export class AnalyticsManager {
     static runStartTime = 0;
 
     static track(name, data) {
-        window.umami?.track(name, data);
+        try {
+            window.umami?.track(name, data);
+        } catch {} // analytics must never get in the way of the game
     }
 
     static trackGameStart({ difficulty, platform, audioEnabled }) {

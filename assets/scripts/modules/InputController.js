@@ -15,7 +15,9 @@ export class InputController {
 
     triggerHapticFeedback(intensity = 'light') {
         if (!this.game.settings.hapticEnabled || !navigator.vibrate) return;
-        navigator.vibrate(HAPTICS[intensity] ?? 20);
+        try {
+            navigator.vibrate(HAPTICS[intensity] ?? 20);
+        } catch {} // a buzz is never worth breaking a run over
     }
 
     setupKeyboard() {

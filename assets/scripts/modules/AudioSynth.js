@@ -15,6 +15,11 @@ const MELODY = [
     [698, 2.2, 0.6], [659, 3.0, 0.3], [587, 3.4, 0.3], [523, 3.8, 0.8]
 ];
 
+// Sound is a nice-to-have: if Web Audio misbehaves (a closed or interrupted context, say) the game just goes quiet.
+const quietly = (action) => {
+    try { action(); } catch {}
+};
+
 export class AudioSynth {
     constructor(game) {
         this.game = game;
@@ -26,7 +31,7 @@ export class AudioSynth {
     enableAudio() {
         try {
             if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            if (this.ctx.state === 'suspended') this.ctx.resume();
+            if (this.ctx.state !== 'running') this.ctx.resume()?.catch(() => {}); // also wakes it after an iOS interruption
         } catch {
             this.ctx = null; // no Web Audio here: the game is just quiet
         }
@@ -34,7 +39,7 @@ export class AudioSynth {
 
     play(name) {
         if (!this.ctx || !this.game.settings.sfxEnabled) return;
-        SFX[name](this);
+        quietly(() => SFX[name](this));
     }
 
     // One oscillator note.
@@ -79,14 +84,16 @@ export class AudioSynth {
     startBackgroundMusic() {
         if (!this.ctx || !this.game.settings.musicEnabled) return;
         this.stopBackgroundMusic();
-        this.musicBus = this.ctx.createGain();
-        this.musicBus.connect(this.ctx.destination);
-        this.playMelody();
-        this.musicLoop = setInterval(() => this.playMelody(), 8000);
+        quietly(() => {
+            this.musicBus = this.ctx.createGain();
+            this.musicBus.connect(this.ctx.destination);
+            this.playMelody();
+            this.musicLoop = setInterval(() => this.playMelody(), 8000);
+        });
     }
 
     playMelody() {
-        MELODY.forEach(([hz, at, dur]) => this.note(hz, { at, dur, soft: true, out: this.musicBus }));
+        quietly(() => MELODY.forEach(([hz, at, dur]) => this.note(hz, { at, dur, soft: true, out: this.musicBus })));
     }
 
     stopBackgroundMusic() {
@@ -96,7 +103,7 @@ export class AudioSynth {
 
         const bus = this.musicBus;
         this.musicBus = null;
-        bus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02); // quick fade, then unplug whatever is still scheduled
-        setTimeout(() => bus.disconnect(), 300);
+        quietly(() => bus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02)); // quick fade, then unplug whatever is still scheduled
+        setTimeout(() => quietly(() => bus.disconnect()), 300);
     }
 }

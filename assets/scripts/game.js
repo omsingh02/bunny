@@ -36,7 +36,6 @@ export class BunnyRunnerGame {
         this.score = 0;
         this.scoreTimer = 0;
         this.gameTime = 0;            // seconds of actual play (pauses with the game)
-        this.clock = new THREE.Clock();
         this.renderPending = true;    // the scene is only redrawn on idle screens when this is set
 
         // Movement (tuned for a snappy arcade feel: ~470ms jump, ~75ms lane change)
@@ -112,6 +111,7 @@ export class BunnyRunnerGame {
         });
 
         // Three.js objects (created in init)
+        this.clock = null;
         this.scene = null;
         this.camera = null;
         this.renderer = null;
@@ -134,6 +134,7 @@ export class BunnyRunnerGame {
 
     init() {
         try {
+            this.ui.init(); // first, so the error screen's Retry button works whatever fails next
             this.setupThreeJS();
             this.setupLights();
             this.scene.add(ProceduralModels.createGround(this.lanes));
@@ -141,7 +142,6 @@ export class BunnyRunnerGame {
             this.scene.add(this.bunny);
 
             this.input.init();
-            this.ui.init();
             this.ui.syncSettings(this.settings);
             this.setupPageEvents();
 
@@ -151,14 +151,19 @@ export class BunnyRunnerGame {
             this.ui.showError("Initialization Error", error.message, error);
         } finally {
             $("loading-screen").classList.add("hidden");
+            $("loading-screen").inert = true; // faded out for the eye; gone for screen readers too
         }
     }
 
     setupThreeJS() {
+        if (typeof THREE === "undefined") {
+            throw new Error("Three.js could not be loaded. Check your internet connection and try again.");
+        }
         if (!this.checkWebGLSupport()) {
             throw new Error("WebGL is not supported in your browser.");
         }
 
+        this.clock = new THREE.Clock();
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x87CEEB);
         this.scene.fog = new THREE.Fog(0x87CEEB, 10, 50);
@@ -172,6 +177,8 @@ export class BunnyRunnerGame {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.handleResize(); // sizes the renderer and frames the camera
+        // a phone can drop the WebGL context while the app is in the background; Three.js restores it, but the canvas comes back blank
+        this.renderer.domElement.addEventListener("webglcontextrestored", () => { this.renderPending = true; });
 
         this.particleSystem = new ParticleSystem(this.scene);
         this.worldManager = new WorldManager(this.scene, this.lanes);
@@ -316,6 +323,7 @@ export class BunnyRunnerGame {
         if (this.gameState !== "paused") return;
         this.clock.getDelta(); // skip the time spent paused
         this.gameState = "playing";
+        this.audio.enableAudio(); // the click on RESUME is the chance to wake audio that was interrupted
         this.audio.startBackgroundMusic();
         this.ui.showScreen("game-hud");
     }
@@ -506,9 +514,9 @@ export class BunnyRunnerGame {
 
     toggleFullscreen() {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {});
+            document.documentElement.requestFullscreen?.()?.catch(() => {});
         } else {
-            document.exitFullscreen().catch(() => {});
+            document.exitFullscreen?.()?.catch(() => {});
         }
     }
 }
