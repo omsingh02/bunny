@@ -168,9 +168,14 @@ export class CdpClient {
         answer.catch(() => {}); // the page may already be gone
     }
 
-    // Runs `source` in every new document, before the page's own scripts
+    // Runs `source` in every new document, before the page's own scripts. Returns an id for removeOnNewDocument()
     async evalOnNewDocument(source) {
-        await this.send('Page.addScriptToEvaluateOnNewDocument', { source });
+        const { identifier } = await this.send('Page.addScriptToEvaluateOnNewDocument', { source });
+        return identifier;
+    }
+
+    async removeOnNewDocument(identifier) {
+        await this.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
     }
 
     async setTouch(enabled) {
@@ -185,11 +190,20 @@ export class CdpClient {
         });
     }
 
-    // Presses and releases a key, e.g. press('ArrowLeft', 37) or press('Space', 32, ' ')
-    async press(code, keyCode, key = code) {
+    // Presses and releases a key, e.g. press('ArrowLeft', 37) or press('Space', 32, ' ').
+    // Give `text` (' ' for Space, '\r' for Enter) when the key should also do what it does in a real browser,
+    // such as pressing the focused button.
+    async press(code, keyCode, key = code, text = undefined) {
         const event = { code, key, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode };
-        await this.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...event });
+        await this.send('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', text, ...event });
         await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event });
+    }
+
+    // A real left-button click at page coordinates (unlike element.click(), it focuses the button and fires pointer events)
+    async mouseClick(x, y) {
+        const event = { x, y, button: 'left', clickCount: 1 };
+        await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...event });
+        await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...event });
     }
 
     // Uncaught exceptions and console.error() calls made by the page

@@ -1,11 +1,12 @@
 // smoke.mjs - plays the real game in headless Chromium: menu, difficulty, countdown, keyboard,
 // combo, pause, settings, game over, leaderboard, a reload, and a phone-sized run with touch input.
-// Needs Chrome or Chromium (found automatically, or set CHROME_BIN) and internet (Three.js comes from a CDN),
-// or THREE_JS=/path/to/three.min.js.
+// Needs Chrome or Chromium (found automatically, or set CHROME_BIN). Three.js is downloaded once and reused
+// (or set THREE_JS=/path/to/three.min.js when offline).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startStaticServer } from './helpers/static-server.mjs';
 import { CdpClient } from './helpers/cdp-client.mjs';
+import { serveThree } from './helpers/three.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
@@ -22,8 +23,7 @@ async function open(viewport, { touch = false } = {}) {
     try {
         await client.launch('about:blank', viewport);
         await client.blockUrls(['https://a.omsingh.me/*']); // tests shouldn't talk to analytics
-        // no internet? point THREE_JS at a local copy of three.min.js (r128) and the CDN request is answered from it
-        if (process.env.THREE_JS) await client.serveFile('https://cdnjs.cloudflare.com/ajax/libs/three.js/*', process.env.THREE_JS);
+        await serveThree(client); // the CDN request is answered from a local copy (see helpers/three.mjs)
         await client.evalOnNewDocument(`window.__events = []; window.umami = { track: (name, data) => window.__events.push({ name, data }) };`);
         if (touch) await client.setTouch(true);
         await client.goto(server.url + '/');
